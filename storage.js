@@ -1,4 +1,13 @@
-import { isSheetsConfigured, SHEETS_WEB_APP_URL } from './sheets-config.js';
+import { isGoogleConfigured } from './google-config.js';
+import {
+  initGoogleAuth,
+  restoreSession,
+  signInWithGoogle,
+  signOut,
+  getCurrentUser,
+  formatAuthError,
+} from './google-auth.js';
+import { loadMovementsFromSheet, saveMovementsToSheet } from './sheets-api.js';
 
 const LOCAL_KEY = 'mis-finanzas-movimientos';
 
@@ -19,49 +28,8 @@ function writeLocal(items) {
   localStorage.setItem(LOCAL_KEY, JSON.stringify(items));
 }
 
-async function fetchFromSheets() {
-  const response = await fetch(`${SHEETS_WEB_APP_URL}?action=get`);
-
-  if (!response.ok) {
-    throw new Error('No se pudo leer la hoja');
-  }
-
-  const data = await response.json();
-  return data.items || [];
-}
-
-async function saveToSheets(items) {
-  const response = await fetch(SHEETS_WEB_APP_URL, {
-    method: 'POST',
-    body: JSON.stringify({ action: 'save', items }),
-    headers: { 'Content-Type': 'text/plain' },
-  });
-
-  if (!response.ok) {
-    throw new Error('No se pudo guardar en la hoja');
-  }
-
-  const data = await response.json();
-  if (data.error) {
-    throw new Error(data.error);
-  }
-}
-
 export function getMovements() {
   return movementsCache;
-}
-
-export async function saveMovements(items) {
-  movementsCache = items;
-  writeLocal(items);
-
-  if (!isSheetsConfigured()) {
-    return;
-  }
-
-  await saveToSheets(items);
-  syncMode = 'sheets';
-  lastSyncError = null;
 }
 
 export function isCloudEnabled() {
@@ -72,32 +40,87 @@ export function getSyncStatus() {
   return { mode: syncMode, error: lastSyncError };
 }
 
-export async function init() {
-  movementsCache = readLocal();
-  syncMode = 'local';
-  lastSyncError = null;
+export function getUser() {
+  return getCurrentUser();
+}
 
-  if (!isSheetsConfigured()) {
-    return { mode: 'local' };
+export { signInWithGoogle, signOut, formatAuthError, isGoogleConfigured };
+
+export async function initGoogle() {
+  await initGoogleAuth();
+}
+
+export async function tryRestoreSession() {
+  if (!isGoogleConfigured()) {
+    movementsCache = readLocal();
+    syncMode = 'local';
+    return { authenticated: false, localOnly: true };
+  }
+
+  const user = await restoreSession();
+  if (!user) {
+    movementsCache = [];
+    syncMode = 'local';
+    return { authenticated: false, localOnly: false };
   }
 
   try {
-    const remoteItems = await fetchFromSheets();
+    movementsCache = await loadMovementsFromSheet();
+    writeLocal(movementsCache);
+    syncMode = 'sheets';
+    lastSyncError = null;
+    return { authenticated: true, user, mode: 'sheets' };
+  } catch (error) {
+    lastSyncError = error.message;
+    movementsCache = readLocal();
+    syncMode = 'local';
+    return { authenticated: true, user, mode: 'local', error: error.message };
+  }
+}
+
+export async function completeSignIn() {
+  const user = await signInWithGoogle();
+
+  try {
     const localItems = readLocal();
+    const remoteItems = await loadMovementsFromSheet();
 
     if (remoteItems.length === 0 && localItems.length > 0) {
       movementsCache = localItems;
-      await saveToSheets(localItems);
+      await saveMovementsToSheet(localItems);
     } else {
       movementsCache = remoteItems;
       writeLocal(remoteItems);
     }
 
     syncMode = 'sheets';
-    return { mode: 'sheets' };
+    lastSyncError = null;
+    return { user, mode: 'sheets' };
   } catch (error) {
     lastSyncError = error.message;
+    movementsCache = readLocal();
     syncMode = 'local';
-    return { mode: 'local', error: error.message };
+    return { user, mode: 'local', error: error.message };
   }
+}
+
+export async function saveMovements(items) {
+  movementsCache = items;
+
+  if (!isGoogleConfigured() || !getCurrentUser()) {
+    writeLocal(items);
+    syncMode = 'local';
+    return;
+  }
+
+  await saveMovementsToSheet(items);
+  writeLocal(items);
+  syncMode = 'sheets';
+  lastSyncError = null;
+}
+
+export function clearAfterSignOut() {
+  movementsCache = [];
+  syncMode = 'local';
+  lastSyncError = null;
 }

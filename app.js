@@ -33,7 +33,12 @@ const periodTabs = document.querySelectorAll('.period-tab');
 const tabbarBtns = document.querySelectorAll('.tabbar-btn');
 const appShell = document.getElementById('app-shell');
 const loadingScreen = document.getElementById('loading-screen');
-const syncStatus = document.getElementById('sync-status');
+const authScreen = document.getElementById('auth-screen');
+const authGoogle = document.getElementById('auth-google');
+const authError = document.getElementById('auth-error');
+const authDevNote = document.getElementById('auth-dev-note');
+const btnLogout = document.getElementById('btn-logout');
+const userEmail = document.getElementById('user-email');
 
 let currentAction = 'add';
 let editingId = null;
@@ -692,25 +697,61 @@ function showLoading(show) {
   loadingScreen.hidden = !show;
 }
 
-function updateSyncStatus(result) {
-  syncStatus.classList.remove('sync-sheets', 'sync-error');
-
-  if (result.mode === 'sheets') {
-    syncStatus.textContent = 'Sheets';
-    syncStatus.classList.add('sync-sheets');
-    return;
-  }
-
-  if (result.error) {
-    syncStatus.textContent = 'Sin sync';
-    syncStatus.classList.add('sync-error');
-    syncStatus.title = result.error;
-    return;
-  }
-
-  syncStatus.textContent = 'Local';
-  syncStatus.title = 'Configura Google Sheets para sincronizar';
+function showAuthScreen(show, { devNote = false } = {}) {
+  authScreen.hidden = !show;
+  appShell.hidden = show;
+  authDevNote.hidden = !devNote;
 }
+
+function showAuthError(message) {
+  if (!message) {
+    authError.hidden = true;
+    authError.textContent = '';
+    return;
+  }
+  authError.hidden = false;
+  authError.textContent = message;
+}
+
+function updateUserUI(result) {
+  const user = storage.getUser();
+
+  if (user?.email) {
+    userEmail.hidden = false;
+    userEmail.textContent = user.email;
+    btnLogout.hidden = false;
+    return;
+  }
+
+  userEmail.hidden = true;
+  btnLogout.hidden = !storage.isGoogleConfigured();
+}
+
+async function handleGoogleSignIn() {
+  showAuthError('');
+  authGoogle.disabled = true;
+
+  try {
+    const result = await storage.completeSignIn();
+    showAuthScreen(false);
+    updateUserUI(result);
+    renderAll();
+  } catch (error) {
+    showAuthError(storage.formatAuthError(error));
+  } finally {
+    authGoogle.disabled = false;
+  }
+}
+
+authGoogle.addEventListener('click', handleGoogleSignIn);
+
+btnLogout.addEventListener('click', () => {
+  storage.signOut();
+  storage.clearAfterSignOut();
+  showAuthScreen(true);
+  showAuthError('');
+  updateUserUI({});
+});
 
 function showFileProtocolWarning() {
   document.body.innerHTML = `
@@ -738,11 +779,27 @@ async function boot() {
 
   showLoading(true);
 
-  const result = await storage.init();
-  updateSyncStatus(result);
+  if (storage.isGoogleConfigured()) {
+    await storage.initGoogle();
+    const session = await storage.tryRestoreSession();
 
+    if (session.authenticated) {
+      showAuthScreen(false);
+      updateUserUI(session);
+      showLoading(false);
+      renderAll();
+      return;
+    }
+
+    showLoading(false);
+    showAuthScreen(true);
+    return;
+  }
+
+  await storage.tryRestoreSession();
   showLoading(false);
-  appShell.hidden = false;
+  showAuthScreen(false, { devNote: false });
+  updateUserUI({});
   renderAll();
 }
 

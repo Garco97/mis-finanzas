@@ -1,48 +1,39 @@
 # Mis Finanzas
 
-Webapp móvil para gestionar ingresos y gastos, con sincronización opcional en Google Sheets.
+Webapp móvil para gestionar ingresos y gastos. Los datos se guardan en **tu propia Google Sheet**, protegida con **login de Google**.
 
-## Publicación en GitHub Pages (gratis)
+## Cómo funciona la seguridad
 
-1. Sube el repo a GitHub (ya configurado como privado)
-2. En el repo: **Settings → Pages**
-3. Source: **Deploy from a branch**
-4. Branch: `main` / carpeta `/ (root)`
-5. Guarda y espera 1-2 minutos
-6. Tu app estará en: `https://TU_USUARIO.github.io/mis-finanzas/`
+- Cada usuario inicia sesión con **su cuenta de Google**
+- La app crea una hoja **solo tuya** en tu Drive
+- Sin tu login, nadie puede leer tus movimientos
+- No hay URL pública ni clave estática compartida
 
-## Conectar Google Sheets (gratis)
+## Configuración de Google Cloud (una vez)
 
-### 1. Crear la hoja
-
-1. Crea una [Google Sheet](https://sheets.google.com) nueva
-2. Puedes dejarla vacía; el script creará la pestaña `Movimientos`
-
-### 2. Instalar el script
-
-1. En la hoja: **Extensiones → Apps Script**
-2. Borra el código por defecto y pega el contenido de `google-apps-script/Code.gs`
-3. Guarda el proyecto
-
-### 3. Publicar como aplicación web
-
-1. **Implementar → Nueva implementación**
-2. Tipo: **Aplicación web**
-3. Ejecutar como: **Yo**
-4. Quién tiene acceso: **Cualquiera**
-5. Implementar y copia la URL (termina en `/exec`)
-
-### 4. Configurar la app
-
-1. Abre `sheets-config.js`
-2. Pega la URL en `SHEETS_WEB_APP_URL`
-3. Haz commit y push (o edita directamente en GitHub)
+1. Ve a [Google Cloud Console](https://console.cloud.google.com)
+2. Crea un proyecto nuevo
+3. Activa la API **Google Sheets API**
+4. **APIs y servicios → Pantalla de consentimiento OAuth**
+   - Tipo: Externo (o Interno si es solo para ti)
+   - Añade los scopes: `spreadsheets`, `email`, `profile`
+5. **APIs y servicios → Credenciales → Crear credenciales → ID de cliente OAuth**
+   - Tipo: Aplicación web
+   - Orígenes autorizados:
+     - `http://localhost:8765`
+     - `https://TU_USUARIO.github.io`
+   - URIs de redirección: no hace falta (usamos popup/token)
+6. Copia el **Client ID** en `google-config.js`:
 
 ```js
-export const SHEETS_WEB_APP_URL = 'https://script.google.com/macros/s/XXXX/exec';
+export const GOOGLE_CLIENT_ID = '123456.apps.googleusercontent.com';
 ```
 
-4. Recarga la app: arriba a la derecha debería poner **Sheets** en verde
+## Publicar en GitHub Pages
+
+1. Repo: **Settings → Pages → Branch `main` → `/ (root)`**
+2. URL: `https://TU_USUARIO.github.io/mis-finanzas/`
+3. Añade esa URL en los orígenes autorizados de Google Cloud
 
 ## Probar en local
 
@@ -50,24 +41,30 @@ export const SHEETS_WEB_APP_URL = 'https://script.google.com/macros/s/XXXX/exec'
 python3 -m http.server 8765
 ```
 
-Abre http://localhost:8765 (no abras el HTML directamente).
+Abre http://localhost:8765
+
+## Sin configurar Google (solo desarrollo)
+
+Si `google-config.js` tiene el placeholder, la app funciona en **modo local** sin login (solo para desarrollar).
 
 ## Estructura
 
 ```
 mis-finanzas/
-├── index.html              # App
-├── app.js                  # Lógica
-├── styles.css              # Estilos
-├── storage.js              # Local + Sheets
-├── sheets-config.js        # URL de tu Apps Script
-├── google-apps-script/
-│   └── Code.gs             # Script para Google Sheets
-└── sheets-config.example.js
+├── index.html
+├── app.js
+├── storage.js          # Orquestación login + datos
+├── google-auth.js      # OAuth con Google
+├── sheets-api.js       # Lectura/escritura en tu Sheet
+├── google-config.js    # Tu Client ID OAuth
+└── google-config.example.js
 ```
 
-## Notas
+## Flujo del usuario
 
-- Sin configurar Sheets, los datos se guardan solo en el navegador (`localStorage`)
-- La URL del Apps Script funciona como clave de acceso: no la compartas públicamente
-- Puedes ver y editar los movimientos directamente en la hoja de cálculo
+1. Abre la app → **Continuar con Google**
+2. Autoriza el acceso a Sheets
+3. La app crea "Mis Finanzas" en tu Drive (solo la primera vez)
+4. Tus movimientos se guardan ahí y en caché local del navegador
+
+Puedes abrir la hoja desde Google Drive y ver o editar los datos manualmente.
