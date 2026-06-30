@@ -22,9 +22,7 @@ Webapp móvil para gestionar ingresos y gastos. Los datos se guardan en **tu pro
    - Orígenes autorizados:
      - `http://localhost:8765`
      - `https://TU_USUARIO.github.io`
-   - URIs de redirección autorizadas (necesario en móvil):
-     - `http://localhost:8765/`
-     - `https://TU_USUARIO.github.io/mis-finanzas/`
+   - URIs de redirección: no hace falta (login con token de Google Identity Services)
 6. Copia el **Client ID** en `google-config.js`:
 
 ```js

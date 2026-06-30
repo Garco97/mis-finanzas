@@ -1,7 +1,6 @@
 import { isGoogleConfigured } from './google-config.js';
 import {
   initGoogleAuth,
-  handleOAuthRedirect,
   restoreSession,
   signInWithGoogle,
   signOut,
@@ -73,10 +72,6 @@ export { signInWithGoogle, signOut, formatAuthError, isGoogleConfigured };
 
 export async function initGoogle() {
   await initGoogleAuth();
-}
-
-export async function handleOAuthCallback() {
-  return handleOAuthRedirect();
 }
 
 export async function refreshFromCloud() {
