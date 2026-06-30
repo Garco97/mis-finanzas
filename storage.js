@@ -106,17 +106,23 @@ export async function completeSignIn() {
 
 export async function saveMovements(items) {
   movementsCache = items;
+  writeLocal(items);
 
   if (!isGoogleConfigured() || !getCurrentUser()) {
-    writeLocal(items);
     syncMode = 'local';
-    return;
+    return { ok: true, mode: 'local' };
   }
 
-  await saveMovementsToSheet(items);
-  writeLocal(items);
-  syncMode = 'sheets';
-  lastSyncError = null;
+  try {
+    await saveMovementsToSheet(items);
+    syncMode = 'sheets';
+    lastSyncError = null;
+    return { ok: true, mode: 'sheets' };
+  } catch (error) {
+    lastSyncError = error.message;
+    syncMode = 'local';
+    return { ok: false, mode: 'local', error: error.message };
+  }
 }
 
 export function clearAfterSignOut() {

@@ -115,6 +115,21 @@ export async function signInWithGoogle() {
   return user;
 }
 
+export async function refreshAccessToken() {
+  if (!tokenClient) {
+    throw new Error('Sesión expirada. Vuelve a iniciar sesión.');
+  }
+
+  const session = loadSession();
+  if (!session?.user) {
+    throw new Error('Sesión expirada. Vuelve a iniciar sesión.');
+  }
+
+  const token = await requestAccessToken('');
+  saveSession(token, session.user);
+  return token;
+}
+
 export async function restoreSession() {
   const session = loadSession();
   if (!session) return null;

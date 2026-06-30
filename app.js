@@ -39,6 +39,9 @@ const authError = document.getElementById('auth-error');
 const authDevNote = document.getElementById('auth-dev-note');
 const btnLogout = document.getElementById('btn-logout');
 const userEmail = document.getElementById('user-email');
+const toastEl = document.getElementById('toast');
+
+let toastTimer = null;
 
 let currentAction = 'add';
 let editingId = null;
@@ -353,8 +356,11 @@ function getMovementById(id) {
 
 async function deleteMovement(id) {
   const movements = loadMovements().filter((m) => m.id !== id);
-  await storage.saveMovements(movements);
+  const result = await storage.saveMovements(movements);
   renderAll();
+  if (!result.ok) {
+    showToast(`Borrado en el móvil. Error en Sheets: ${result.error}`);
+  }
 }
 
 function editMovement(id) {
@@ -538,7 +544,7 @@ function requestDelete(id) {
   openConfirmModal();
 }
 
-function executeDelete() {
+async function executeDelete() {
   const id = pendingDeleteId;
   if (!id) return;
 
@@ -547,12 +553,23 @@ function executeDelete() {
 
   const row = document.querySelector(`.swipe-row[data-id="${id}"]`);
   if (!row) {
-    deleteMovement(id);
+    try {
+      await deleteMovement(id);
+    } catch (error) {
+      showToast(error.message || 'No se pudo borrar');
+    }
     return;
   }
 
   row.classList.add('swipe-row-removing');
-  window.setTimeout(() => deleteMovement(id), 340);
+  window.setTimeout(async () => {
+    try {
+      await deleteMovement(id);
+    } catch (error) {
+      row.classList.remove('swipe-row-removing');
+      showToast(error.message || 'No se pudo borrar');
+    }
+  }, 340);
 }
 
 function openModal(action, movement = null) {
@@ -621,9 +638,21 @@ async function confirmMovement() {
     });
   }
 
-  await storage.saveMovements(movements);
-  closeModal();
-  renderAll();
+  btnConfirm.disabled = true;
+
+  try {
+    const result = await storage.saveMovements(movements);
+    closeModal();
+    renderAll();
+
+    if (!result.ok) {
+      showToast(`Guardado en el móvil. Error en Sheets: ${result.error}`);
+    }
+  } catch (error) {
+    showToast(error.message || 'No se pudo guardar');
+  } finally {
+    btnConfirm.disabled = false;
+  }
 }
 
 btnAdd.addEventListener('click', () => openModal('add'));
@@ -695,6 +724,19 @@ statsNext.addEventListener('click', () => {
 
 function showLoading(show) {
   loadingScreen.hidden = !show;
+}
+
+function showToast(message, type = 'error') {
+  if (!message) return;
+
+  toastEl.textContent = message;
+  toastEl.classList.toggle('toast-info', type === 'info');
+  toastEl.hidden = false;
+
+  if (toastTimer) window.clearTimeout(toastTimer);
+  toastTimer = window.setTimeout(() => {
+    toastEl.hidden = true;
+  }, 5000);
 }
 
 function showAuthScreen(show, { devNote = false } = {}) {
@@ -788,6 +830,9 @@ async function boot() {
       updateUserUI(session);
       showLoading(false);
       renderAll();
+      if (session.error) {
+        showToast(`Datos locales. Error en Sheets: ${session.error}`);
+      }
       return;
     }
 

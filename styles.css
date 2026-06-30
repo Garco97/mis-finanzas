@@ -809,3 +809,29 @@ body.modal-open {
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--tabbar-inner) + var(--safe-bottom) + 1rem);
+  transform: translateX(-50%);
+  z-index: 500;
+  max-width: calc(100% - 2rem);
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  background: #7f1d1d;
+  color: #fff;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  text-align: center;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.toast[hidden] {
+  display: none;
+}
+
+.toast.toast-info {
+  background: var(--surface-hover);
+  color: var(--text);
+}

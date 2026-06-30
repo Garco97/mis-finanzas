@@ -1,12 +1,12 @@
-import { getAccessToken, getCurrentUser, getSheetIdKey } from './google-auth.js';
+import { getAccessToken, getCurrentUser, getSheetIdKey, refreshAccessToken } from './google-auth.js';
 
 const SHEET_NAME = 'Movimientos';
 
-async function sheetsFetch(path, options = {}) {
+async function apiRequest(url, options = {}, retry = true) {
   const token = getAccessToken();
-  if (!token) throw new Error('Sesión no válida');
+  if (!token) throw new Error('Sesión no válida. Vuelve a iniciar sesión.');
 
-  const response = await fetch(`https://sheets.googleapis.com/v4/spreadsheets${path}`, {
+  const response = await fetch(url, {
     ...options,
     headers: {
       Authorization: `Bearer ${token}`,
@@ -15,15 +15,18 @@ async function sheetsFetch(path, options = {}) {
     },
   });
 
-  if (response.status === 401) {
-    throw new Error('Sesión expirada. Vuelve a iniciar sesión.');
+  if (response.status === 401 && retry) {
+    await refreshAccessToken();
+    return apiRequest(url, options, false);
   }
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
-    throw new Error(error?.error?.message || 'Error al acceder a Google Sheets');
+    const message = error?.error?.message || `Error de Google Sheets (${response.status})`;
+    throw new Error(message);
   }
 
+  if (response.status === 204) return null;
   return response.json();
 }
 
@@ -52,28 +55,6 @@ function movementsToRows(items) {
   ];
 }
 
-async function writeSheetValues(spreadsheetId, values) {
-  const range = `${SHEET_NAME}!A1:E`;
-  const token = getAccessToken();
-
-  const response = await fetch(
-    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(range)}?valueInputOption=RAW`,
-    {
-      method: 'PUT',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ values }),
-    }
-  );
-
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({}));
-    throw new Error(error?.error?.message || 'No se pudo guardar en la hoja');
-  }
-}
-
 export async function ensureSpreadsheet() {
   const user = getCurrentUser();
   if (!user?.sub) throw new Error('Usuario no autenticado');
@@ -82,7 +63,7 @@ export async function ensureSpreadsheet() {
   const existingId = localStorage.getItem(storageKey);
   if (existingId) return existingId;
 
-  const created = await sheetsFetch('', {
+  const created = await apiRequest('https://sheets.googleapis.com/v4/spreadsheets', {
     method: 'POST',
     body: JSON.stringify({
       properties: { title: 'Mis Finanzas' },
@@ -91,18 +72,50 @@ export async function ensureSpreadsheet() {
   });
 
   localStorage.setItem(storageKey, created.spreadsheetId);
-  await writeSheetValues(created.spreadsheetId, [['id', 'type', 'amount', 'note', 'date']]);
+
+  await apiRequest(
+    `https://sheets.googleapis.com/v4/spreadsheets/${created.spreadsheetId}/values:batchUpdate`,
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        valueInputOption: 'RAW',
+        data: [{
+          range: `${SHEET_NAME}!A1`,
+          majorDimension: 'ROWS',
+          values: [['id', 'type', 'amount', 'note', 'date']],
+        }],
+      }),
+    }
+  );
+
   return created.spreadsheetId;
 }
 
 export async function loadMovementsFromSheet() {
   const spreadsheetId = await ensureSpreadsheet();
-  const range = `${SHEET_NAME}!A2:E`;
-  const data = await sheetsFetch(`/${spreadsheetId}/values/${encodeURIComponent(range)}`);
+  const range = encodeURIComponent(`${SHEET_NAME}!A2:E`);
+  const data = await apiRequest(
+    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${range}`
+  );
   return rowsToMovements(data.values || []);
 }
 
 export async function saveMovementsToSheet(items) {
   const spreadsheetId = await ensureSpreadsheet();
-  await writeSheetValues(spreadsheetId, movementsToRows(items));
+  const values = movementsToRows(items);
+
+  await apiRequest(
+    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values:batchUpdate`,
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        valueInputOption: 'RAW',
+        data: [{
+          range: `${SHEET_NAME}!A1`,
+          majorDimension: 'ROWS',
+          values,
+        }],
+      }),
+    }
+  );
 }
