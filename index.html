@@ -72,9 +72,6 @@
           <input type="checkbox" id="notifications-enabled">
           <span>Recibir aviso diario a las 21:00</span>
         </label>
-        <button type="button" class="btn btn-ghost btn-block" id="btn-test-notification">
-          Probar notificación ahora
-        </button>
       </section>
 
       <section class="movements">
@@ -136,6 +133,14 @@
       </section>
     </section>
   </main>
+
+  <div class="notif-prompt" id="notif-prompt" hidden role="dialog" aria-labelledby="notif-prompt-text">
+    <p class="notif-prompt-text" id="notif-prompt-text"></p>
+    <div class="notif-prompt-actions">
+      <button type="button" class="btn btn-primary btn-sm" id="notif-prompt-enable">Activar avisos</button>
+      <button type="button" class="btn btn-ghost btn-sm" id="notif-prompt-dismiss">Ahora no</button>
+    </div>
+  </div>
 
   <nav class="tabbar" aria-label="Menú principal">
     <button type="button" class="tabbar-btn tabbar-btn-active" data-view="wallet" aria-current="page">

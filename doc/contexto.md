@@ -25,5 +25,5 @@
 ## Problemas resueltos
 - Sheets API desactivada → activar en GCP
 - Guardado silencioso → toast + guardar local primero
-- Aviso diario 21:00: «¿Has metido ya los gastos del día?» (SW + fallback al abrir app)
+- Aviso diario 21:00 + banner cada 3 días si no hay permiso (7 si bloqueado)
 - Borrado en Sheets → limpiar filas A2:E antes de reescribir (batchUpdate no borra sobrantes)

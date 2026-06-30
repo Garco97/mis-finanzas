@@ -44,7 +44,10 @@ const userEmail = document.getElementById('user-email');
 const toastEl = document.getElementById('toast');
 const notificationsEnabled = document.getElementById('notifications-enabled');
 const notificationsStatus = document.getElementById('notifications-status');
-const btnTestNotification = document.getElementById('btn-test-notification');
+const notifPrompt = document.getElementById('notif-prompt');
+const notifPromptText = document.getElementById('notif-prompt-text');
+const notifPromptEnable = document.getElementById('notif-prompt-enable');
+const notifPromptDismiss = document.getElementById('notif-prompt-dismiss');
 
 let toastTimer = null;
 
@@ -731,6 +734,50 @@ statsNext.addEventListener('click', () => {
 function updateNotificationsUI() {
   notificationsEnabled.checked = notifications.isNotificationsEnabled();
   notificationsStatus.textContent = notifications.getStatusMessage();
+  updateNotificationPrompt();
+}
+
+function updateNotificationPrompt() {
+  if (!storage.getUser() || authScreen.hidden === false) {
+    notifPrompt.hidden = true;
+    return;
+  }
+
+  if (!notifications.shouldShowPermissionPrompt()) {
+    notifPrompt.hidden = true;
+    return;
+  }
+
+  notifPromptText.textContent = notifications.getPromptMessage();
+  notifPromptEnable.hidden = !notifications.canRequestPermissionViaPrompt();
+  notifPromptEnable.textContent = Notification.permission === 'granted'
+    ? 'Activar aviso'
+    : 'Activar avisos';
+  notifPromptDismiss.textContent = Notification.permission === 'denied'
+    ? 'Entendido'
+    : 'Ahora no';
+  notifPrompt.hidden = false;
+}
+
+async function handlePromptEnable() {
+  try {
+    if (Notification.permission === 'granted' && !notifications.isNotificationsEnabled()) {
+      notificationsEnabled.checked = true;
+      await handleNotificationsToggle();
+    } else {
+      await notifications.enableNotifications();
+      notificationsEnabled.checked = true;
+      showToast('Aviso diario a las 21:00 activado', 'info');
+    }
+    updateNotificationsUI();
+  } catch (error) {
+    showToast(error.message || 'No se pudieron activar');
+  }
+}
+
+function handlePromptDismiss() {
+  notifications.snoozePermissionPrompt();
+  notifPrompt.hidden = true;
 }
 
 async function handleRefresh() {
@@ -770,21 +817,6 @@ async function handleNotificationsToggle() {
   }
 
   updateNotificationsUI();
-}
-
-async function handleTestNotification() {
-  btnTestNotification.disabled = true;
-
-  try {
-    await notifications.sendTestNotification();
-    notificationsEnabled.checked = true;
-    updateNotificationsUI();
-    showToast('Notificación enviada', 'info');
-  } catch (error) {
-    showToast(error.message || 'No se pudo enviar la notificación');
-  } finally {
-    btnTestNotification.disabled = false;
-  }
 }
 
 function showLoading(show) {
@@ -856,7 +888,8 @@ async function handleGoogleSignIn() {
 authGoogle.addEventListener('click', handleGoogleSignIn);
 
 notificationsEnabled.addEventListener('change', handleNotificationsToggle);
-btnTestNotification.addEventListener('click', handleTestNotification);
+notifPromptEnable.addEventListener('click', handlePromptEnable);
+notifPromptDismiss.addEventListener('click', handlePromptDismiss);
 
 btnRefreshButtons.forEach((btn) => {
   btn.addEventListener('click', handleRefresh);
@@ -966,4 +999,5 @@ document.addEventListener('visibilitychange', () => {
 
   notifications.scheduleDailyReminder();
   notifications.checkDailyReminder();
+  updateNotificationPrompt();
 });

@@ -1,4 +1,7 @@
 const NOTIFICATIONS_KEY = 'mis-finanzas-notifications-enabled';
+const PROMPT_SNOOZE_KEY = 'mis-finanzas-notif-prompt-snooze';
+const PROMPT_SNOOZE_MS = 3 * 24 * 60 * 60 * 1000;
+const PROMPT_SNOOZE_DENIED_MS = 7 * 24 * 60 * 60 * 1000;
 const REMINDER_HOUR = 21;
 const REMINDER_MINUTE = 0;
 const REMINDER_TITLE = 'Mis Finanzas';
@@ -149,6 +152,7 @@ export async function enableNotifications() {
 
   await registerServiceWorker();
   setNotificationsEnabled(true);
+  localStorage.removeItem(PROMPT_SNOOZE_KEY);
   await scheduleDailyReminder();
   return permission;
 }
@@ -190,14 +194,35 @@ export async function checkDailyReminder() {
   await markReminderSentToday();
 }
 
-export async function sendTestNotification() {
-  await enableNotifications();
+export function shouldShowPermissionPrompt() {
+  if (!isSupported()) return false;
+  if (isNotificationsEnabled() && Notification.permission === 'granted') return false;
 
-  await displayNotification(REMINDER_TITLE, {
-    body: '¡Notificación de prueba! Todo funciona correctamente.',
-    tag: 'mis-finanzas-test',
-    renotify: true,
-  });
+  const snoozeUntil = Number(localStorage.getItem(PROMPT_SNOOZE_KEY) || 0);
+  return Date.now() >= snoozeUntil;
+}
+
+export function snoozePermissionPrompt() {
+  const duration = Notification.permission === 'denied'
+    ? PROMPT_SNOOZE_DENIED_MS
+    : PROMPT_SNOOZE_MS;
+  localStorage.setItem(PROMPT_SNOOZE_KEY, String(Date.now() + duration));
+}
+
+export function getPromptMessage() {
+  if (Notification.permission === 'denied') {
+    return 'Las notificaciones están bloqueadas. Actívalas en los ajustes del móvil para recibir el aviso diario a las 21:00.';
+  }
+
+  if (Notification.permission === 'granted') {
+    return 'Activa el aviso diario a las 21:00 para recordarte apuntar tus gastos.';
+  }
+
+  return '¿Quieres recibir un aviso cada día a las 21:00 para apuntar tus gastos?';
+}
+
+export function canRequestPermissionViaPrompt() {
+  return Notification.permission !== 'denied';
 }
 
 export function getPermissionStatus() {
@@ -221,8 +246,8 @@ export function getStatusMessage() {
   }
 
   if (status === 'granted') {
-    return 'Permiso concedido. Activa el interruptor para recibir avisos.';
+    return 'Activa el interruptor para recibir el aviso diario a las 21:00.';
   }
 
-  return 'Pulsa el botón de prueba para activarlas.';
+  return 'Te preguntaremos de vez en cuando si quieres activarlas.';
 }

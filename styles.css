@@ -207,6 +207,38 @@ body {
   width: 100%;
 }
 
+.notif-prompt {
+  position: fixed;
+  left: 1rem;
+  right: 1rem;
+  bottom: calc(var(--tabbar-inner) + var(--safe-bottom) + 0.75rem);
+  z-index: 90;
+  background: var(--surface);
+  border: 1px solid var(--surface-hover);
+  border-radius: var(--radius);
+  padding: 1rem;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.notif-prompt-text {
+  font-size: 0.875rem;
+  color: var(--text);
+  line-height: 1.45;
+  margin-bottom: 0.85rem;
+}
+
+.notif-prompt-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.btn-sm {
+  font-size: 0.8125rem;
+  padding: 0.55rem 0.85rem;
+  border-radius: 10px;
+}
+
 .btn {
   display: flex;
   align-items: center;
