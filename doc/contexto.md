@@ -25,5 +25,5 @@
 ## Problemas resueltos
 - Sheets API desactivada → activar en GCP
 - Guardado silencioso → toast + guardar local primero
-- Botón actualizar (↻) en Cartera y Estadísticas: sincroniza Sheets y recarga la PWA
+- Aviso diario 21:00: «¿Has metido ya los gastos del día?» (SW + fallback al abrir app)
 - Borrado en Sheets → limpiar filas A2:E antes de reescribir (batchUpdate no borra sobrantes)

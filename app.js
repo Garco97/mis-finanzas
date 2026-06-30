@@ -757,14 +757,16 @@ async function handleNotificationsToggle() {
   if (notificationsEnabled.checked) {
     try {
       await notifications.enableNotifications();
-      showToast('Notificaciones activadas', 'info');
+      showToast('Aviso diario a las 21:00 activado', 'info');
     } catch (error) {
       notificationsEnabled.checked = false;
       notifications.setNotificationsEnabled(false);
+      await notifications.disableDailyReminder();
       showToast(error.message || 'No se pudieron activar');
     }
   } else {
     notifications.setNotificationsEnabled(false);
+    await notifications.disableDailyReminder();
   }
 
   updateNotificationsUI();
@@ -903,7 +905,10 @@ async function boot() {
         showAuthScreen(false);
         updateUserUI(result);
         updateNotificationsUI();
-        notifications.registerServiceWorker();
+        notifications.registerServiceWorker().then(() => {
+          notifications.scheduleDailyReminder();
+          notifications.checkDailyReminder();
+        });
         showLoading(false);
         renderAll();
         if (result?.error) {
@@ -926,7 +931,10 @@ async function boot() {
       showAuthScreen(false);
       updateUserUI(session);
       updateNotificationsUI();
-      notifications.registerServiceWorker();
+      notifications.registerServiceWorker().then(() => {
+        notifications.scheduleDailyReminder();
+        notifications.checkDailyReminder();
+      });
       showLoading(false);
       renderAll();
       if (session.error) {
@@ -955,4 +963,7 @@ document.addEventListener('visibilitychange', () => {
   storage.refreshFromCloud().then((result) => {
     if (result.ok) renderAll();
   });
+
+  notifications.scheduleDailyReminder();
+  notifications.checkDailyReminder();
 });
