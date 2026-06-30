@@ -1,0 +1,27 @@
+---
+description: Siempre commit y push tras cambios en mis-finanzas
+alwaysApply: true
+---
+
+# Commit y push obligatorio
+
+En este proyecto (`mis-finanzas`), **siempre** haz commit y push al terminar cambios de código o configuración, salvo que el usuario diga explícitamente que no.
+
+## Cuándo aplicar
+
+- Tras implementar una feature, fix o refactor
+- Tras cambios en HTML, CSS, JS, service worker o docs del proyecto
+- El usuario quiere probar en GitHub Pages / móvil → necesita deploy
+
+## Flujo
+
+1. `git status`, `git diff`, `git log -3 --oneline`
+2. Commit con mensaje claro en español (1-2 frases, el porqué)
+3. `git push` a `origin`
+4. Confirmar al usuario el hash del commit
+
+## Excepciones
+
+- No commitear secretos (`.env`, client secret)
+- No push si el usuario pide explícitamente no subir cambios
+- No amend salvo las reglas de git del usuario

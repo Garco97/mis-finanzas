@@ -1,4 +1,5 @@
 import * as storage from './storage.js';
+import * as notifications from './notifications.js';
 
 const OPEN_THRESHOLD = 36;
 const OPEN_SNAP_MIN = 72;
@@ -40,6 +41,9 @@ const authDevNote = document.getElementById('auth-dev-note');
 const btnLogout = document.getElementById('btn-logout');
 const userEmail = document.getElementById('user-email');
 const toastEl = document.getElementById('toast');
+const notificationsEnabled = document.getElementById('notifications-enabled');
+const notificationsStatus = document.getElementById('notifications-status');
+const btnTestNotification = document.getElementById('btn-test-notification');
 
 let toastTimer = null;
 
@@ -320,6 +324,7 @@ function renderStats() {
 }
 
 function renderAll() {
+  updateNotificationsUI();
   renderWallet();
   renderStats();
 }
@@ -722,6 +727,43 @@ statsNext.addEventListener('click', () => {
   renderStats();
 });
 
+function updateNotificationsUI() {
+  notificationsEnabled.checked = notifications.isNotificationsEnabled();
+  notificationsStatus.textContent = notifications.getStatusMessage();
+}
+
+async function handleNotificationsToggle() {
+  if (notificationsEnabled.checked) {
+    try {
+      await notifications.enableNotifications();
+      showToast('Notificaciones activadas', 'info');
+    } catch (error) {
+      notificationsEnabled.checked = false;
+      notifications.setNotificationsEnabled(false);
+      showToast(error.message || 'No se pudieron activar');
+    }
+  } else {
+    notifications.setNotificationsEnabled(false);
+  }
+
+  updateNotificationsUI();
+}
+
+async function handleTestNotification() {
+  btnTestNotification.disabled = true;
+
+  try {
+    await notifications.sendTestNotification();
+    notificationsEnabled.checked = true;
+    updateNotificationsUI();
+    showToast('Notificación enviada', 'info');
+  } catch (error) {
+    showToast(error.message || 'No se pudo enviar la notificación');
+  } finally {
+    btnTestNotification.disabled = false;
+  }
+}
+
 function showLoading(show) {
   loadingScreen.hidden = !show;
 }
@@ -788,6 +830,9 @@ async function handleGoogleSignIn() {
 
 authGoogle.addEventListener('click', handleGoogleSignIn);
 
+notificationsEnabled.addEventListener('change', handleNotificationsToggle);
+btnTestNotification.addEventListener('click', handleTestNotification);
+
 btnLogout.addEventListener('click', () => {
   storage.signOut();
   storage.clearAfterSignOut();
@@ -830,6 +875,8 @@ async function boot() {
         const result = await storage.completeSignIn(redirectUser);
         showAuthScreen(false);
         updateUserUI(result);
+        updateNotificationsUI();
+        notifications.registerServiceWorker();
         showLoading(false);
         renderAll();
         if (result?.error) {
@@ -851,6 +898,8 @@ async function boot() {
     if (session.authenticated) {
       showAuthScreen(false);
       updateUserUI(session);
+      updateNotificationsUI();
+      notifications.registerServiceWorker();
       showLoading(false);
       renderAll();
       if (session.error) {

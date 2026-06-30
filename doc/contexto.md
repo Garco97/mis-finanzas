@@ -7,12 +7,13 @@
 ## Auth Google
 - Client ID en `google-config.js`
 - Proyecto GCP: `662148207869`
-- Desktop y móvil: login con GIS token client (sin client_secret)
-- Sesión en `localStorage` (más fiable en móvil y PWA)
+- PC: popup con Google Identity Services
+- Móvil: redirección OAuth (token en URL, sin client_secret)
+- Sesión en `localStorage`
 
 ## Google Cloud — URIs requeridas
 - Orígenes JS: `https://garco97.github.io`, `http://localhost:8765`
-- Redirect URIs (móvil): ya no necesarias
+- Redirect URIs (móvil): `https://garco97.github.io/mis-finanzas/`, `http://localhost:8765/`
 - API activa: Google Sheets API, Google Drive API
 - Una sola hoja por cuenta: Drive primero, luego caché local
 - Sincroniza al volver a la pestaña (visibilitychange)
@@ -24,5 +25,5 @@
 ## Problemas resueltos
 - Sheets API desactivada → activar en GCP
 - Guardado silencioso → toast + guardar local primero
-- Login unificado móvil/PC con GIS token client
+- Notificaciones: `notifications.js` + `sw.js` (permiso + botón de prueba)
 - Borrado en Sheets → limpiar filas A2:E antes de reescribir (batchUpdate no borra sobrantes)
