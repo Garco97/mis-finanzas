@@ -103,6 +103,13 @@ export async function loadMovementsFromSheet() {
 export async function saveMovementsToSheet(items) {
   const spreadsheetId = await ensureSpreadsheet();
   const values = movementsToRows(items);
+  const dataRange = encodeURIComponent(`${SHEET_NAME}!A2:E`);
+
+  // batchUpdate no borra filas sobrantes; limpiar datos antes de reescribir
+  await apiRequest(
+    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${dataRange}:clear`,
+    { method: 'POST', body: JSON.stringify({}) }
+  );
 
   await apiRequest(
     `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values:batchUpdate`,

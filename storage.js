@@ -1,6 +1,7 @@
 import { isGoogleConfigured } from './google-config.js';
 import {
   initGoogleAuth,
+  handleOAuthRedirect,
   restoreSession,
   signInWithGoogle,
   signOut,
@@ -50,6 +51,10 @@ export async function initGoogle() {
   await initGoogleAuth();
 }
 
+export async function handleOAuthCallback() {
+  return handleOAuthRedirect();
+}
+
 export async function tryRestoreSession() {
   if (!isGoogleConfigured()) {
     movementsCache = readLocal();
@@ -78,8 +83,9 @@ export async function tryRestoreSession() {
   }
 }
 
-export async function completeSignIn() {
-  const user = await signInWithGoogle();
+export async function completeSignIn(existingUser = null) {
+  const user = existingUser || (await signInWithGoogle());
+  if (!user) return null;
 
   try {
     const localItems = readLocal();
