@@ -2,6 +2,7 @@ import { GOOGLE_CLIENT_ID } from './google-config.js';
 
 const SESSION_KEY = 'mis-finanzas-session';
 const SHEET_ID_PREFIX = 'mis-finanzas-sheet-';
+const OAUTH_STATE_KEY = 'mis-finanzas-oauth-state';
 
 const SCOPES = [
   'https://www.googleapis.com/auth/spreadsheets',
@@ -56,6 +57,37 @@ export function getCurrentUser() {
 
 export function getSheetIdKey(userId) {
   return `${SHEET_ID_PREFIX}${userId}`;
+}
+
+function isMobileDevice() {
+  return (
+    /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) ||
+    (navigator.maxTouchPoints > 1 && /MacIntel|Macintosh/.test(navigator.platform))
+  );
+}
+
+function useRedirectFlow() {
+  return isMobileDevice();
+}
+
+export function getRedirectUri() {
+  const url = new URL(location.href);
+  url.search = '';
+  url.hash = '';
+
+  if (url.pathname.endsWith('/index.html')) {
+    url.pathname = url.pathname.replace(/index\.html$/, '');
+  }
+
+  if (!url.pathname.endsWith('/')) {
+    url.pathname += '/';
+  }
+
+  return url.origin + url.pathname;
+}
+
+function clearOAuthUrl() {
+  history.replaceState({}, '', location.pathname);
 }
 
 function waitForGoogleIdentity() {
@@ -121,7 +153,59 @@ async function fetchUserInfo(token) {
   return response.json();
 }
 
+function startMobileRedirectSignIn() {
+  const redirectUri = getRedirectUri();
+  const state = crypto.randomUUID?.() || String(Date.now());
+  sessionStorage.setItem(OAUTH_STATE_KEY, state);
+
+  const params = new URLSearchParams({
+    client_id: GOOGLE_CLIENT_ID,
+    redirect_uri: redirectUri,
+    response_type: 'token',
+    scope: SCOPES,
+    include_granted_scopes: 'true',
+    prompt: 'consent',
+    state,
+  });
+
+  location.assign(`https://accounts.google.com/o/oauth2/v2/auth?${params}`);
+}
+
+export async function handleOAuthRedirect() {
+  const hash = location.hash?.substring(1);
+  if (!hash || !hash.includes('access_token=')) return null;
+
+  const params = new URLSearchParams(hash);
+  const error = params.get('error');
+  const token = params.get('access_token');
+  const state = params.get('state');
+  const savedState = sessionStorage.getItem(OAUTH_STATE_KEY);
+
+  clearOAuthUrl();
+  sessionStorage.removeItem(OAUTH_STATE_KEY);
+
+  if (error) {
+    throw new Error(error);
+  }
+
+  if (savedState && state && savedState !== state) {
+    throw new Error('Respuesta de Google no válida. Vuelve a intentarlo.');
+  }
+
+  if (!token) return null;
+
+  const expiresIn = Number(params.get('expires_in') || 3600);
+  const user = await fetchUserInfo(token);
+  saveSession(token, user, expiresIn);
+  return user;
+}
+
 export async function signInWithGoogle() {
+  if (useRedirectFlow()) {
+    startMobileRedirectSignIn();
+    return null;
+  }
+
   const token = await requestAccessToken('consent');
   const user = await fetchUserInfo(token);
   saveSession(token, user);
@@ -173,6 +257,7 @@ export function signOut() {
   }
 
   localStorage.removeItem(SESSION_KEY);
+  sessionStorage.removeItem(OAUTH_STATE_KEY);
 }
 
 export function formatAuthError(error) {
@@ -184,6 +269,14 @@ export function formatAuthError(error) {
 
   if (message.includes('access_denied')) {
     return 'Has cancelado el acceso.';
+  }
+
+  if (message.includes('redirect_uri_mismatch')) {
+    return `Añade ${getRedirectUri()} en URIs de redirección de Google Cloud.`;
+  }
+
+  if (message.includes('unsupported_response_type')) {
+    return 'Google no permite este tipo de login. Abre la app en Safari o Chrome.';
   }
 
   return message;

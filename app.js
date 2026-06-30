@@ -775,6 +775,7 @@ async function handleGoogleSignIn() {
 
   try {
     const result = await storage.completeSignIn();
+    if (!result) return;
     showAuthScreen(false);
     updateUserUI(result);
     renderAll();
@@ -822,6 +823,27 @@ async function boot() {
   showLoading(true);
 
   if (storage.isGoogleConfigured()) {
+    try {
+      const redirectUser = await storage.handleOAuthCallback();
+      if (redirectUser) {
+        await storage.initGoogle();
+        const result = await storage.completeSignIn(redirectUser);
+        showAuthScreen(false);
+        updateUserUI(result);
+        showLoading(false);
+        renderAll();
+        if (result?.error) {
+          showToast(`Datos locales. Error en Sheets: ${result.error}`);
+        }
+        return;
+      }
+    } catch (error) {
+      showLoading(false);
+      showAuthScreen(true);
+      showAuthError(storage.formatAuthError(error));
+      return;
+    }
+
     await storage.initGoogle();
 
     const session = await storage.tryRestoreSession();
