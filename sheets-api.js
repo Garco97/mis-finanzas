@@ -1,6 +1,7 @@
 import { getAccessToken, getCurrentUser, getSheetIdKey, refreshAccessToken } from './google-auth.js';
 
 const SHEET_NAME = 'Movimientos';
+const SPREADSHEET_TITLE = 'Mis Finanzas';
 
 async function apiRequest(url, options = {}, retry = true) {
   const token = getAccessToken();
@@ -22,7 +23,7 @@ async function apiRequest(url, options = {}, retry = true) {
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
-    const message = error?.error?.message || `Error de Google Sheets (${response.status})`;
+    const message = error?.error?.message || `Error de Google (${response.status})`;
     throw new Error(message);
   }
 
@@ -55,23 +56,70 @@ function movementsToRows(items) {
   ];
 }
 
-export async function ensureSpreadsheet() {
-  const user = getCurrentUser();
-  if (!user?.sub) throw new Error('Usuario no autenticado');
+function cacheSpreadsheetId(storageKey, spreadsheetId) {
+  localStorage.setItem(storageKey, spreadsheetId);
+}
 
-  const storageKey = getSheetIdKey(user.sub);
-  const existingId = localStorage.getItem(storageKey);
-  if (existingId) return existingId;
+async function isSpreadsheetAccessible(spreadsheetId) {
+  try {
+    await apiRequest(
+      `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}?fields=spreadsheetId`
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}
 
+async function loadMovementsFromSpreadsheetId(spreadsheetId) {
+  const range = encodeURIComponent(`${SHEET_NAME}!A2:E`);
+  const data = await apiRequest(
+    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${range}`
+  );
+  return rowsToMovements(data.values || []);
+}
+
+async function findSpreadsheetInDrive() {
+  const query = encodeURIComponent(
+    `name = '${SPREADSHEET_TITLE}' and mimeType = 'application/vnd.google-apps.spreadsheet' and trashed = false`
+  );
+
+  const data = await apiRequest(
+    `https://www.googleapis.com/drive/v3/files?q=${query}&fields=files(id,name,createdTime)&orderBy=createdTime&pageSize=20`
+  );
+
+  const files = data.files || [];
+  if (files.length === 0) return null;
+  if (files.length === 1) return files[0].id;
+
+  let bestId = files[0].id;
+  let bestCount = -1;
+
+  for (const file of files) {
+    try {
+      const movements = await loadMovementsFromSpreadsheetId(file.id);
+      if (movements.length > bestCount) {
+        bestCount = movements.length;
+        bestId = file.id;
+      }
+    } catch {
+      // ignorar hojas inaccesibles
+    }
+  }
+
+  return bestId;
+}
+
+async function createSpreadsheet(storageKey) {
   const created = await apiRequest('https://sheets.googleapis.com/v4/spreadsheets', {
     method: 'POST',
     body: JSON.stringify({
-      properties: { title: 'Mis Finanzas' },
+      properties: { title: SPREADSHEET_TITLE },
       sheets: [{ properties: { title: SHEET_NAME } }],
     }),
   });
 
-  localStorage.setItem(storageKey, created.spreadsheetId);
+  cacheSpreadsheetId(storageKey, created.spreadsheetId);
 
   await apiRequest(
     `https://sheets.googleapis.com/v4/spreadsheets/${created.spreadsheetId}/values:batchUpdate`,
@@ -91,13 +139,33 @@ export async function ensureSpreadsheet() {
   return created.spreadsheetId;
 }
 
+export async function ensureSpreadsheet() {
+  const user = getCurrentUser();
+  if (!user?.sub) throw new Error('Usuario no autenticado');
+
+  const storageKey = getSheetIdKey(user.sub);
+  const cachedId = localStorage.getItem(storageKey);
+
+  if (cachedId && await isSpreadsheetAccessible(cachedId)) {
+    return cachedId;
+  }
+
+  if (cachedId) {
+    localStorage.removeItem(storageKey);
+  }
+
+  const existingId = await findSpreadsheetInDrive();
+  if (existingId) {
+    cacheSpreadsheetId(storageKey, existingId);
+    return existingId;
+  }
+
+  return createSpreadsheet(storageKey);
+}
+
 export async function loadMovementsFromSheet() {
   const spreadsheetId = await ensureSpreadsheet();
-  const range = encodeURIComponent(`${SHEET_NAME}!A2:E`);
-  const data = await apiRequest(
-    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${range}`
-  );
-  return rowsToMovements(data.values || []);
+  return loadMovementsFromSpreadsheetId(spreadsheetId);
 }
 
 export async function saveMovementsToSheet(items) {

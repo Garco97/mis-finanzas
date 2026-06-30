@@ -7,6 +7,7 @@ const SHEET_ID_PREFIX = 'mis-finanzas-sheet-';
 
 const SCOPES = [
   'https://www.googleapis.com/auth/spreadsheets',
+  'https://www.googleapis.com/auth/drive.metadata.readonly',
   'openid',
   'email',
   'profile',

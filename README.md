@@ -13,10 +13,10 @@ Webapp móvil para gestionar ingresos y gastos. Los datos se guardan en **tu pro
 
 1. Ve a [Google Cloud Console](https://console.cloud.google.com)
 2. Crea un proyecto nuevo
-3. Activa la API **Google Sheets API**
+3. Activa las APIs **Google Sheets API** y **Google Drive API**
 4. **APIs y servicios → Pantalla de consentimiento OAuth**
    - Tipo: Externo (o Interno si es solo para ti)
-   - Añade los scopes: `spreadsheets`, `email`, `profile`
+   - Añade los scopes: `spreadsheets`, `drive.metadata.readonly`, `email`, `profile`
 5. **APIs y servicios → Credenciales → Crear credenciales → ID de cliente OAuth**
    - Tipo: Aplicación web
    - Orígenes autorizados:

@@ -14,7 +14,8 @@
 ## Google Cloud — URIs requeridas
 - Orígenes JS: `https://garco97.github.io`, `http://localhost:8765`
 - Redirect URIs (móvil): `https://garco97.github.io/mis-finanzas/`, `http://localhost:8765/`
-- API activa: Google Sheets API
+- API activa: Google Sheets API, Google Drive API
+- Una sola hoja por cuenta: busca "Mis Finanzas" en Drive si no hay ID en localStorage
 
 ## Datos
 - Hoja "Mis Finanzas" en Drive del usuario (pestaña Movimientos)
