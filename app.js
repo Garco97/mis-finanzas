@@ -39,6 +39,7 @@ const authGoogle = document.getElementById('auth-google');
 const authError = document.getElementById('auth-error');
 const authDevNote = document.getElementById('auth-dev-note');
 const btnLogout = document.getElementById('btn-logout');
+const btnRefreshButtons = document.querySelectorAll('.btn-refresh');
 const userEmail = document.getElementById('user-email');
 const toastEl = document.getElementById('toast');
 const notificationsEnabled = document.getElementById('notifications-enabled');
@@ -732,6 +733,26 @@ function updateNotificationsUI() {
   notificationsStatus.textContent = notifications.getStatusMessage();
 }
 
+async function handleRefresh() {
+  btnRefreshButtons.forEach((btn) => {
+    btn.disabled = true;
+    btn.classList.add('is-spinning');
+  });
+
+  try {
+    if (storage.getUser()) {
+      const result = await storage.refreshFromCloud();
+      if (!result.ok && result.error) {
+        showToast(result.error);
+      }
+    }
+  } catch (error) {
+    showToast(error.message || 'Error al actualizar');
+  } finally {
+    location.reload();
+  }
+}
+
 async function handleNotificationsToggle() {
   if (notificationsEnabled.checked) {
     try {
@@ -804,11 +825,13 @@ function updateUserUI(result) {
     userEmail.hidden = false;
     userEmail.textContent = user.email;
     btnLogout.hidden = false;
+    btnRefreshButtons.forEach((btn) => { btn.hidden = false; });
     return;
   }
 
   userEmail.hidden = true;
   btnLogout.hidden = !storage.isGoogleConfigured();
+  btnRefreshButtons.forEach((btn) => { btn.hidden = !storage.isGoogleConfigured(); });
 }
 
 async function handleGoogleSignIn() {
@@ -832,6 +855,10 @@ authGoogle.addEventListener('click', handleGoogleSignIn);
 
 notificationsEnabled.addEventListener('change', handleNotificationsToggle);
 btnTestNotification.addEventListener('click', handleTestNotification);
+
+btnRefreshButtons.forEach((btn) => {
+  btn.addEventListener('click', handleRefresh);
+});
 
 btnLogout.addEventListener('click', () => {
   storage.signOut();

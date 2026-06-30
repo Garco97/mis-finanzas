@@ -75,6 +75,41 @@ body {
   margin-bottom: 0;
 }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-shrink: 0;
+}
+
+.btn-header-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border: none;
+  background: var(--surface);
+  color: var(--text-muted);
+  border-radius: 8px;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  touch-action: manipulation;
+}
+
+.btn-header-icon:active {
+  background: var(--surface-hover);
+}
+
+.btn-header-icon.is-spinning svg {
+  animation: spin-refresh 0.8s linear infinite;
+}
+
+@keyframes spin-refresh {
+  to { transform: rotate(360deg); }
+}
+
 .btn-logout {
   border: none;
   background: var(--surface);

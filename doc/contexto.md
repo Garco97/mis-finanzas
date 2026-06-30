@@ -25,5 +25,5 @@
 ## Problemas resueltos
 - Sheets API desactivada → activar en GCP
 - Guardado silencioso → toast + guardar local primero
-- Notificaciones: `notifications.js` + `sw.js` (permiso + botón de prueba)
+- Botón actualizar (↻) en Cartera y Estadísticas: sincroniza Sheets y recarga la PWA
 - Borrado en Sheets → limpiar filas A2:E antes de reescribir (batchUpdate no borra sobrantes)
