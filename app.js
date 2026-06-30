@@ -871,3 +871,11 @@ async function boot() {
 }
 
 boot();
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible' || !storage.getUser()) return;
+
+  storage.refreshFromCloud().then((result) => {
+    if (result.ok) renderAll();
+  });
+});

@@ -15,7 +15,8 @@
 - Orígenes JS: `https://garco97.github.io`, `http://localhost:8765`
 - Redirect URIs (móvil): `https://garco97.github.io/mis-finanzas/`, `http://localhost:8765/`
 - API activa: Google Sheets API, Google Drive API
-- Una sola hoja por cuenta: busca "Mis Finanzas" en Drive si no hay ID en localStorage
+- Una sola hoja por cuenta: Drive primero, luego caché local
+- Sincroniza al volver a la pestaña (visibilitychange)
 
 ## Datos
 - Hoja "Mis Finanzas" en Drive del usuario (pestaña Movimientos)

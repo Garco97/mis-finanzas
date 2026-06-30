@@ -60,6 +60,10 @@ function cacheSpreadsheetId(storageKey, spreadsheetId) {
   localStorage.setItem(storageKey, spreadsheetId);
 }
 
+function clearCachedSpreadsheetId(storageKey) {
+  localStorage.removeItem(storageKey);
+}
+
 async function isSpreadsheetAccessible(spreadsheetId) {
   try {
     await apiRequest(
@@ -80,34 +84,39 @@ async function loadMovementsFromSpreadsheetId(spreadsheetId) {
 }
 
 async function findSpreadsheetInDrive() {
-  const query = encodeURIComponent(
-    `name = '${SPREADSHEET_TITLE}' and mimeType = 'application/vnd.google-apps.spreadsheet' and trashed = false`
-  );
+  try {
+    const query = encodeURIComponent(
+      `name = '${SPREADSHEET_TITLE}' and mimeType = 'application/vnd.google-apps.spreadsheet' and trashed = false`
+    );
 
-  const data = await apiRequest(
-    `https://www.googleapis.com/drive/v3/files?q=${query}&fields=files(id,name,createdTime)&orderBy=createdTime&pageSize=20`
-  );
+    const data = await apiRequest(
+      `https://www.googleapis.com/drive/v3/files?q=${query}&fields=files(id,name,createdTime)&orderBy=createdTime&pageSize=20`
+    );
 
-  const files = data.files || [];
-  if (files.length === 0) return null;
-  if (files.length === 1) return files[0].id;
+    const files = data.files || [];
+    if (files.length === 0) return null;
+    if (files.length === 1) return files[0].id;
 
-  let bestId = files[0].id;
-  let bestCount = -1;
+    let bestId = files[0].id;
+    let bestCount = -1;
 
-  for (const file of files) {
-    try {
-      const movements = await loadMovementsFromSpreadsheetId(file.id);
-      if (movements.length > bestCount) {
-        bestCount = movements.length;
-        bestId = file.id;
+    for (const file of files) {
+      try {
+        const movements = await loadMovementsFromSpreadsheetId(file.id);
+        if (movements.length > bestCount) {
+          bestCount = movements.length;
+          bestId = file.id;
+        }
+      } catch {
+        // ignorar hojas inaccesibles
       }
-    } catch {
-      // ignorar hojas inaccesibles
     }
-  }
 
-  return bestId;
+    return bestId;
+  } catch {
+    // Drive API no disponible o sin permiso: no bloquear la creación de una hoja nueva
+    return null;
+  }
 }
 
 async function createSpreadsheet(storageKey) {
@@ -139,45 +148,61 @@ async function createSpreadsheet(storageKey) {
   return created.spreadsheetId;
 }
 
-export async function ensureSpreadsheet() {
+async function resolveSpreadsheetId({ createIfMissing }) {
   const user = getCurrentUser();
   if (!user?.sub) throw new Error('Usuario no autenticado');
 
   const storageKey = getSheetIdKey(user.sub);
+
+  // Drive primero: misma hoja en móvil y PC aunque cada uno tenga caché distinta
+  const driveId = await findSpreadsheetInDrive();
+  if (driveId) {
+    cacheSpreadsheetId(storageKey, driveId);
+    return driveId;
+  }
+
   const cachedId = localStorage.getItem(storageKey);
-
-  if (cachedId && await isSpreadsheetAccessible(cachedId)) {
-    return cachedId;
-  }
-
   if (cachedId) {
-    localStorage.removeItem(storageKey);
+    if (await isSpreadsheetAccessible(cachedId)) {
+      return cachedId;
+    }
+    clearCachedSpreadsheetId(storageKey);
   }
 
-  const existingId = await findSpreadsheetInDrive();
-  if (existingId) {
-    cacheSpreadsheetId(storageKey, existingId);
-    return existingId;
-  }
+  if (!createIfMissing) return null;
 
   return createSpreadsheet(storageKey);
 }
 
+export async function ensureSpreadsheet() {
+  return resolveSpreadsheetId({ createIfMissing: true });
+}
+
 export async function loadMovementsFromSheet() {
-  const spreadsheetId = await ensureSpreadsheet();
+  const spreadsheetId = await resolveSpreadsheetId({ createIfMissing: false });
+  if (!spreadsheetId) return [];
   return loadMovementsFromSpreadsheetId(spreadsheetId);
 }
 
-export async function saveMovementsToSheet(items) {
+export async function saveMovementsToSheet(items, retried = false) {
   const spreadsheetId = await ensureSpreadsheet();
   const values = movementsToRows(items);
   const dataRange = encodeURIComponent(`${SHEET_NAME}!A2:E`);
 
-  // batchUpdate no borra filas sobrantes; limpiar datos antes de reescribir
-  await apiRequest(
-    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${dataRange}:clear`,
-    { method: 'POST', body: JSON.stringify({}) }
-  );
+  try {
+    await apiRequest(
+      `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${dataRange}:clear`,
+      { method: 'POST', body: JSON.stringify({}) }
+    );
+  } catch (error) {
+    const message = String(error.message);
+    if (!retried && (message.includes('404') || message.includes('not found'))) {
+      const user = getCurrentUser();
+      if (user?.sub) clearCachedSpreadsheetId(getSheetIdKey(user.sub));
+      return saveMovementsToSheet(items, true);
+    }
+    throw error;
+  }
 
   await apiRequest(
     `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values:batchUpdate`,
