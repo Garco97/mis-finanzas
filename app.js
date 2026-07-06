@@ -1,5 +1,6 @@
 import * as storage from './storage.js';
 import * as notifications from './notifications.js';
+import { ensureValidToken } from './google-auth.js';
 
 const OPEN_THRESHOLD = 36;
 const OPEN_SNAP_MIN = 72;
@@ -996,6 +997,10 @@ document.addEventListener('visibilitychange', () => {
   storage.refreshFromCloud().then((result) => {
     if (result.ok) renderAll();
   });
+
+  if (storage.getUser()) {
+    ensureValidToken();
+  }
 
   notifications.scheduleDailyReminder();
   notifications.checkDailyReminder();

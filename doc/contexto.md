@@ -25,5 +25,5 @@
 ## Problemas resueltos
 - Sheets API desactivada → activar en GCP
 - Guardado silencioso → toast + guardar local primero
-- Aviso diario 21:00 + banner cada 3 días si no hay permiso (7 si bloqueado)
+- Sesión Google: 90 días en local; token se renueva en silencio antes de caducar
 - Borrado en Sheets → limpiar filas A2:E antes de reescribir (batchUpdate no borra sobrantes)

@@ -3,6 +3,7 @@ import {
   initGoogleAuth,
   handleOAuthRedirect,
   restoreSession,
+  ensureValidToken,
   signInWithGoogle,
   signOut,
   getCurrentUser,
@@ -109,6 +110,8 @@ export async function tryRestoreSession() {
     syncMode = 'local';
     return { authenticated: false, localOnly: false };
   }
+
+  await ensureValidToken();
 
   const result = await refreshFromCloud();
   if (result.ok) {
