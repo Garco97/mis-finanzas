@@ -70,3 +70,34 @@ mis-finanzas/
 4. Tus movimientos se guardan ahí y en caché local del navegador
 
 Puedes abrir la hoja desde Google Drive y ver o editar los datos manualmente.
+
+## Categorías automáticas
+
+Al escribir la nota de un gasto (p. ej. "Mercadona"), la app sugiere la categoría
+automáticamente. Puedes cambiarla a mano; la app **aprende** tu elección para esa
+nota y la reutilizará la próxima vez.
+
+## Atajo de Apple (meter gastos rápido)
+
+La app puede recibir un gasto por URL, ideal para un Atajo de Apple / Siri:
+
+```
+https://TU_USUARIO.github.io/mis-finanzas/?amount=12,50&note=Cafe&type=gasto&cat=comida
+```
+
+Parámetros:
+
+- `amount` — importe (obligatorio). Acepta coma o punto.
+- `type` — `gasto` (por defecto) o `ingreso`.
+- `note` — descripción opcional.
+- `cat` — categoría opcional (`comida`, `casa`, `transporte`…). Si falta, se adivina por la nota.
+
+Cómo crear el Atajo en iPhone:
+
+1. App **Atajos** → nuevo atajo → acción **"Pedir entrada"** (número) para el importe.
+2. (Opcional) otra **"Pedir entrada"** (texto) para la nota.
+3. Acción **"Abrir URL"** con la URL de arriba, insertando las variables en `amount` y `note`.
+4. Añádelo a la pantalla de inicio o actívalo con "Oye Siri".
+
+> Requiere tener la sesión de Google iniciada en el navegador que abre el atajo.
+> El gasto se guarda, se sincroniza con tu hoja y la URL se limpia sola.

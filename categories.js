@@ -25,3 +25,58 @@ export function getCategoryOrDefault(id) {
 export function isValidCategory(id) {
   return CATEGORY_MAP.has(id);
 }
+
+// Palabras clave por defecto para autocategorizar según la nota/concepto
+export const CATEGORY_KEYWORDS = {
+  comida: [
+    'mercadona', 'carrefour', 'lidl', 'aldi', 'dia', 'alcampo', 'consum',
+    'supermercado', 'super', 'restaurante', 'cafeteria', 'cafe', 'bar',
+    'mcdonald', 'burger', 'kfc', 'telepizza', 'dominos', 'glovo', 'uber eats',
+    'just eat', 'panaderia', 'fruteria', 'carniceria',
+  ],
+  casa: [
+    'alquiler', 'hipoteca', 'luz', 'endesa', 'iberdrola', 'naturgy', 'agua',
+    'gas', 'comunidad', 'ikea', 'leroy', 'bricomart', 'seguro hogar',
+  ],
+  transporte: [
+    'gasolina', 'repsol', 'cepsa', 'bp', 'shell', 'renfe', 'metro', 'autobus',
+    'bus', 'uber', 'cabify', 'taxi', 'parking', 'peaje', 'blablacar', 'bicing',
+  ],
+  ocio: [
+    'cine', 'teatro', 'concierto', 'museo', 'discoteca', 'copas', 'viaje',
+    'hotel', 'airbnb', 'booking',
+  ],
+  juegos: [
+    'steam', 'playstation', 'psn', 'xbox', 'nintendo', 'epic games', 'riot',
+    'twitch', 'game', 'juego',
+  ],
+  salud: [
+    'farmacia', 'clinica', 'dentista', 'hospital', 'medico', 'optica',
+    'gimnasio', 'gym', 'fisio',
+  ],
+  compras: [
+    'amazon', 'zara', 'decathlon', 'el corte ingles', 'aliexpress',
+    'pccomponentes', 'mediamarkt', 'primor', 'druni',
+  ],
+  suscripciones: [
+    'netflix', 'spotify', 'hbo', 'disney', 'prime', 'youtube premium',
+    'icloud', 'google one', 'movistar', 'vodafone', 'orange', 'dropbox',
+    'chatgpt', 'openai',
+  ],
+};
+
+export function guessCategoryByKeywords(text) {
+  if (!text) return null;
+  const normalized = text
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+
+  for (const [categoryId, keywords] of Object.entries(CATEGORY_KEYWORDS)) {
+    if (keywords.some((kw) => normalized.includes(kw))) {
+      return categoryId;
+    }
+  }
+
+  return null;
+}

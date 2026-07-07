@@ -24,6 +24,10 @@
 - Columnas: id, type, amount, note, date, category (A-F)
 - Categorías de gasto en `categories.js`; selector en modal (solo gastos); desglose en Estadísticas
 - Pestaña "Categorías": filtra por categoría y lista todos sus gastos (sin límite de fechas)
+- Autocategorización: palabras clave en `categories.js` + reglas aprendidas (nota→categoría) en localStorage `mis-finanzas-cat-rules`
+- Quick-add por URL (para Atajos de Apple): `?amount=12,50&note=Cafe&type=gasto&cat=comida`
+  - `type`: gasto (por defecto) o ingreso; `cat` opcional (si falta se adivina por la nota)
+  - Requiere sesión de Google iniciada en ese navegador; el movimiento se sincroniza y se limpia la URL
 
 ## Problemas resueltos
 - Sheets API desactivada → activar en GCP

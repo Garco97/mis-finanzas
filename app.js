@@ -1,7 +1,13 @@
 import * as storage from './storage.js';
 import * as notifications from './notifications.js';
 import { ensureValidToken } from './google-auth.js';
-import { CATEGORIES, DEFAULT_CATEGORY_ID, getCategoryOrDefault } from './categories.js';
+import {
+  CATEGORIES,
+  DEFAULT_CATEGORY_ID,
+  getCategoryOrDefault,
+  isValidCategory,
+  guessCategoryByKeywords,
+} from './categories.js';
 
 const OPEN_THRESHOLD = 36;
 const OPEN_SNAP_MIN = 72;
@@ -67,6 +73,7 @@ let toastTimer = null;
 let currentAction = 'add';
 let editingId = null;
 let selectedCategory = DEFAULT_CATEGORY_ID;
+let categoryManual = false;
 let pendingDeleteId = null;
 let openSwipeRow = null;
 let activeSwipeRow = null;
@@ -133,6 +140,51 @@ function getCommitThreshold(row) {
   return Math.max(110, row.offsetWidth * 0.42);
 }
 
+const CATEGORY_RULES_KEY = 'mis-finanzas-cat-rules';
+
+function normalizeText(text) {
+  return text
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+}
+
+function loadLearnedRules() {
+  try {
+    return JSON.parse(localStorage.getItem(CATEGORY_RULES_KEY)) || {};
+  } catch {
+    return {};
+  }
+}
+
+function learnCategoryRule(note, categoryId) {
+  const key = normalizeText(note);
+  if (!key || !isValidCategory(categoryId)) return;
+  const rules = loadLearnedRules();
+  rules[key] = categoryId;
+  localStorage.setItem(CATEGORY_RULES_KEY, JSON.stringify(rules));
+}
+
+function guessCategory(note) {
+  const key = normalizeText(note);
+  if (!key) return null;
+
+  const rules = loadLearnedRules();
+  if (rules[key]) return rules[key];
+
+  const byKeyword = guessCategoryByKeywords(key);
+  if (byKeyword) return byKeyword;
+
+  for (const learnedKey of Object.keys(rules)) {
+    if (learnedKey.length >= 3 && key.includes(learnedKey)) {
+      return rules[learnedKey];
+    }
+  }
+
+  return null;
+}
+
 function buildCategoryPicker() {
   categoryPicker.innerHTML = '';
 
@@ -145,7 +197,10 @@ function buildCategoryPicker() {
     chip.setAttribute('role', 'radio');
     chip.setAttribute('aria-checked', 'false');
     chip.innerHTML = `<span class="chip-icon" aria-hidden="true">${category.icon}</span>${category.label}`;
-    chip.addEventListener('click', () => setSelectedCategory(category.id));
+    chip.addEventListener('click', () => {
+      categoryManual = true;
+      setSelectedCategory(category.id);
+    });
     categoryPicker.appendChild(chip);
   }
 }
@@ -768,7 +823,11 @@ function openModal(action, movement = null) {
 
   categoryField.hidden = isAdd;
   if (!isAdd) {
-    setSelectedCategory(movement?.category || DEFAULT_CATEGORY_ID);
+    // Al editar respetamos su categoría; al crear intentamos adivinarla por la nota
+    categoryManual = Boolean(movement);
+    const initialCategory = movement?.category
+      || (movement ? DEFAULT_CATEGORY_ID : (guessCategory(noteInput.value) || DEFAULT_CATEGORY_ID));
+    setSelectedCategory(initialCategory);
   }
 
   modalOverlay.classList.toggle('withdraw-mode', !isAdd);
@@ -826,6 +885,11 @@ async function confirmMovement() {
       category,
       date: new Date().toISOString(),
     });
+  }
+
+  // Recordar la categoría elegida para esta nota (autocategorización futura)
+  if (!isAdd && noteInput.value.trim()) {
+    learnCategoryRule(noteInput.value, category);
   }
 
   // Optimista: guardar en local, cerrar y refrescar al instante; sincronizar en segundo plano
@@ -892,6 +956,12 @@ amountInput.addEventListener('keydown', (e) => {
     e.preventDefault();
     confirmMovement();
   }
+});
+
+noteInput.addEventListener('input', () => {
+  if (currentAction === 'add' || categoryManual) return;
+  const guess = guessCategory(noteInput.value);
+  if (guess) setSelectedCategory(guess);
 });
 
 noteInput.addEventListener('keydown', (e) => {
@@ -1175,7 +1245,66 @@ async function boot() {
   renderAll();
 }
 
-boot();
+function parseQuickAddParams() {
+  const params = new URLSearchParams(location.search);
+  const amountRaw = params.get('amount') ?? params.get('add') ?? params.get('gasto');
+  if (amountRaw == null) return null;
+
+  const amount = parseAmount(String(amountRaw));
+  if (!amount) return null;
+
+  const typeRaw = (params.get('type') || '').toLowerCase();
+  const isIncome = typeRaw === 'add' || typeRaw === 'ingreso' || params.has('ingreso');
+  const type = isIncome ? 'add' : 'withdraw';
+
+  const note = (params.get('note') || params.get('nota') || '').slice(0, 80).trim();
+
+  let category = '';
+  if (type !== 'add') {
+    const requested = (params.get('cat') || params.get('categoria') || '').toLowerCase();
+    category = isValidCategory(requested)
+      ? requested
+      : (guessCategory(note) || DEFAULT_CATEGORY_ID);
+  }
+
+  return { amount, type, note, category };
+}
+
+function processQuickAdd() {
+  const data = parseQuickAddParams();
+  history.replaceState({}, '', location.pathname);
+  if (!data) return;
+
+  const movements = loadMovements();
+  movements.push({
+    id: createId(),
+    type: data.type,
+    amount: data.amount,
+    note: data.note,
+    category: data.category,
+    date: new Date().toISOString(),
+  });
+
+  if (data.type !== 'add' && data.note) {
+    learnCategoryRule(data.note, data.category);
+  }
+
+  storage.applyMovements(movements);
+  renderAll();
+
+  const label = data.type === 'add' ? 'Ingreso' : 'Gasto';
+  storage.syncRemote().then((result) => {
+    if (!result.ok) {
+      showToast(`${label} guardado en el móvil. Error en Sheets: ${result.error}`);
+    } else {
+      showToast(`${label} de ${formatMoney(data.amount)} añadido`, 'info');
+    }
+  });
+}
+
+boot().then(() => {
+  if (!appShell.hidden) processQuickAdd();
+});
 
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState !== 'visible' || !storage.getUser()) return;
