@@ -168,17 +168,16 @@ body {
 }
 
 .notifications-panel {
-  background: var(--surface);
-  border-radius: var(--radius);
-  padding: 1rem 1.1rem;
-  margin-bottom: 2rem;
+  border-top: 1px solid var(--surface-hover);
+  padding: 1.25rem 0.25rem 0;
+  margin-top: 2rem;
 }
 
 .notifications-panel h2 {
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
   font-weight: 600;
   color: var(--text-muted);
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.4rem;
 }
 
 .notifications-status {
