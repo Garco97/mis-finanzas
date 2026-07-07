@@ -40,18 +40,20 @@ function rowsToMovements(rows) {
       amount: Number(row[2]),
       note: String(row[3] || ''),
       date: String(row[4]),
+      category: String(row[5] || ''),
     }));
 }
 
 function movementsToRows(items) {
   return [
-    ['id', 'type', 'amount', 'note', 'date'],
+    ['id', 'type', 'amount', 'note', 'date', 'category'],
     ...items.map((item) => [
       item.id,
       item.type,
       item.amount,
       item.note || '',
       item.date,
+      item.category || '',
     ]),
   ];
 }
@@ -76,7 +78,7 @@ async function isSpreadsheetAccessible(spreadsheetId) {
 }
 
 async function loadMovementsFromSpreadsheetId(spreadsheetId) {
-  const range = encodeURIComponent(`${SHEET_NAME}!A2:E`);
+  const range = encodeURIComponent(`${SHEET_NAME}!A2:F`);
   const data = await apiRequest(
     `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${range}`
   );
@@ -145,7 +147,7 @@ async function createSpreadsheet(storageKey) {
         data: [{
           range: `${SHEET_NAME}!A1`,
           majorDimension: 'ROWS',
-          values: [['id', 'type', 'amount', 'note', 'date']],
+          values: [['id', 'type', 'amount', 'note', 'date', 'category']],
         }],
       }),
     }
@@ -196,7 +198,7 @@ export async function loadMovementsFromSheet() {
 export async function saveMovementsToSheet(items, retried = false) {
   const spreadsheetId = await ensureSpreadsheet();
   const values = movementsToRows(items);
-  const dataRange = encodeURIComponent(`${SHEET_NAME}!A2:E`);
+  const dataRange = encodeURIComponent(`${SHEET_NAME}!A2:F`);
 
   try {
     await apiRequest(

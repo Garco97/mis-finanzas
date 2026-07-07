@@ -542,6 +542,136 @@ body {
   border-color: var(--green);
 }
 
+.field[hidden] {
+  display: none;
+}
+
+.category-picker {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+}
+
+.category-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  justify-content: center;
+  background: var(--bg);
+  border: 1px solid var(--surface-hover);
+  border-radius: 10px;
+  color: var(--text);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  padding: 0.55rem 0.4rem;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  touch-action: manipulation;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.category-chip .chip-icon {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.category-chip.is-selected {
+  border-color: var(--cat-color, var(--blue));
+  background: color-mix(in srgb, var(--cat-color, var(--blue)) 22%, var(--bg));
+}
+
+.movement-category {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text);
+  background: color-mix(in srgb, var(--cat-color, var(--text-muted)) 24%, var(--surface));
+  border-radius: 999px;
+  padding: 0.1rem 0.5rem;
+  margin-top: 0.25rem;
+  max-width: 100%;
+}
+
+.movement-category .cat-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--cat-color, var(--text-muted));
+  flex-shrink: 0;
+}
+
+.category-breakdown {
+  margin-bottom: 1.5rem;
+}
+
+.category-breakdown h2 {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 0.75rem;
+}
+
+.category-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.category-row {
+  display: grid;
+  grid-template-columns: 1.4rem 1fr;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.category-row .cat-emoji {
+  font-size: 1.05rem;
+  line-height: 1;
+}
+
+.category-row .cat-body {
+  min-width: 0;
+}
+
+.category-row .cat-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+  margin-bottom: 0.3rem;
+}
+
+.category-row .cat-name {
+  font-weight: 600;
+}
+
+.category-row .cat-pct {
+  color: var(--text-muted);
+}
+
+.category-row .cat-bar {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--surface-hover);
+  overflow: hidden;
+}
+
+.category-row .cat-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--cat-color, var(--blue));
+}
+
+.category-row .cat-amount {
+  font-weight: 700;
+  font-size: 0.9375rem;
+  white-space: nowrap;
+}
+
 .modal-actions {
   display: grid;
   grid-template-columns: 1fr 1fr;

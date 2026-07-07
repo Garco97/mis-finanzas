@@ -125,6 +125,11 @@
         </article>
       </div>
 
+      <section class="category-breakdown" id="category-breakdown" hidden>
+        <h2>Gastos por categoría</h2>
+        <ul class="category-list" id="category-list"></ul>
+      </section>
+
       <section class="movements stats-movements">
         <h2 id="stats-list-title">Movimientos del día</h2>
         <ul class="movements-list stats-list" id="stats-list">
@@ -181,6 +186,10 @@
             autocomplete="off"
           >
         </label>
+        <div class="field" id="category-field" hidden>
+          <span>Categoría</span>
+          <div class="category-picker" id="category-picker" role="radiogroup" aria-label="Categoría del gasto"></div>
+        </div>
         <label class="field">
           <span>Nota (opcional)</span>
           <input type="text" id="note-input" maxlength="80" placeholder="Ej: nómina, cena..." autocomplete="off">

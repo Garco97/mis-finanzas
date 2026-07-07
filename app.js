@@ -1,6 +1,7 @@
 import * as storage from './storage.js';
 import * as notifications from './notifications.js';
 import { ensureValidToken } from './google-auth.js';
+import { CATEGORIES, DEFAULT_CATEGORY_ID, getCategoryOrDefault } from './categories.js';
 
 const OPEN_THRESHOLD = 36;
 const OPEN_SNAP_MIN = 72;
@@ -14,6 +15,10 @@ const confirmText = document.getElementById('confirm-text');
 const modalTitle = document.getElementById('modal-title');
 const amountInput = document.getElementById('amount-input');
 const noteInput = document.getElementById('note-input');
+const categoryField = document.getElementById('category-field');
+const categoryPicker = document.getElementById('category-picker');
+const categoryBreakdown = document.getElementById('category-breakdown');
+const categoryList = document.getElementById('category-list');
 const btnAdd = document.getElementById('btn-add');
 const btnWithdraw = document.getElementById('btn-withdraw');
 const btnCancel = document.getElementById('btn-cancel');
@@ -54,6 +59,7 @@ let toastTimer = null;
 
 let currentAction = 'add';
 let editingId = null;
+let selectedCategory = DEFAULT_CATEGORY_ID;
 let pendingDeleteId = null;
 let openSwipeRow = null;
 let activeSwipeRow = null;
@@ -119,6 +125,41 @@ function getCommitThreshold(row) {
   return Math.max(110, row.offsetWidth * 0.42);
 }
 
+function buildCategoryPicker() {
+  categoryPicker.innerHTML = '';
+
+  for (const category of CATEGORIES) {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'category-chip';
+    chip.dataset.category = category.id;
+    chip.style.setProperty('--cat-color', category.color);
+    chip.setAttribute('role', 'radio');
+    chip.setAttribute('aria-checked', 'false');
+    chip.innerHTML = `<span class="chip-icon" aria-hidden="true">${category.icon}</span>${category.label}`;
+    chip.addEventListener('click', () => setSelectedCategory(category.id));
+    categoryPicker.appendChild(chip);
+  }
+}
+
+function setSelectedCategory(id) {
+  selectedCategory = id;
+  categoryPicker.querySelectorAll('.category-chip').forEach((chip) => {
+    const isSelected = chip.dataset.category === id;
+    chip.classList.toggle('is-selected', isSelected);
+    chip.setAttribute('aria-checked', String(isSelected));
+  });
+}
+
+function categoryBadgeHtml(categoryId) {
+  const category = getCategoryOrDefault(categoryId);
+  return `
+    <div class="movement-category" style="--cat-color:${category.color}">
+      <span class="cat-dot" aria-hidden="true"></span>${escapeHtml(category.label)}
+    </div>
+  `;
+}
+
 function createMovementRow(movement) {
   const isAdd = movement.type === 'add';
   const sign = isAdd ? '+' : '−';
@@ -145,6 +186,7 @@ function createMovementRow(movement) {
       <div class="movement-info">
         <div class="movement-type">${typeLabel}</div>
         ${movement.note ? `<div class="movement-note">${escapeHtml(movement.note)}</div>` : ''}
+        ${!isAdd ? categoryBadgeHtml(movement.category) : ''}
         <div class="movement-date">${formatDate(movement.date)}</div>
       </div>
       <div class="movement-amount ${movement.type}">${sign}${formatMoney(movement.amount)}</div>
@@ -297,6 +339,8 @@ function renderStats() {
   statNet.classList.toggle('stat-net-positive', net > 0);
   statNet.classList.toggle('stat-net-negative', net < 0);
 
+  renderCategoryBreakdown(filtered, expense);
+
   statsList.innerHTML = '';
 
   if (filtered.length === 0) {
@@ -320,12 +364,55 @@ function renderStats() {
       <div class="movement-info">
         <div class="movement-type">${typeLabel}</div>
         ${movement.note ? `<div class="movement-note">${escapeHtml(movement.note)}</div>` : ''}
+        ${!isAdd ? categoryBadgeHtml(movement.category) : ''}
         <div class="movement-date">${formatDate(movement.date)}</div>
       </div>
       <div class="movement-amount ${movement.type}">${sign}${formatMoney(movement.amount)}</div>
     `;
     statsList.appendChild(li);
   }
+}
+
+function renderCategoryBreakdown(movements, totalExpense) {
+  const expenses = movements.filter((m) => m.type !== 'add');
+
+  if (expenses.length === 0 || totalExpense <= 0) {
+    categoryBreakdown.hidden = true;
+    categoryList.innerHTML = '';
+    return;
+  }
+
+  const totals = new Map();
+  for (const movement of expenses) {
+    const category = getCategoryOrDefault(movement.category);
+    totals.set(category.id, (totals.get(category.id) || 0) + movement.amount);
+  }
+
+  const sorted = [...totals.entries()].sort((a, b) => b[1] - a[1]);
+
+  categoryList.innerHTML = '';
+
+  for (const [categoryId, amount] of sorted) {
+    const category = getCategoryOrDefault(categoryId);
+    const pct = Math.round((amount / totalExpense) * 100);
+
+    const li = document.createElement('li');
+    li.className = 'category-row';
+    li.style.setProperty('--cat-color', category.color);
+    li.innerHTML = `
+      <span class="cat-emoji" aria-hidden="true">${category.icon}</span>
+      <div class="cat-body">
+        <div class="cat-head">
+          <span class="cat-name">${escapeHtml(category.label)} <span class="cat-pct">${pct}%</span></span>
+          <span class="cat-amount">${formatMoney(amount)}</span>
+        </div>
+        <div class="cat-bar"><div class="cat-bar-fill" style="width:${pct}%"></div></div>
+      </div>
+    `;
+    categoryList.appendChild(li);
+  }
+
+  categoryBreakdown.hidden = false;
 }
 
 function renderAll() {
@@ -599,6 +686,11 @@ function openModal(action, movement = null) {
     btnConfirm.textContent = 'Confirmar';
   }
 
+  categoryField.hidden = isAdd;
+  if (!isAdd) {
+    setSelectedCategory(movement?.category || DEFAULT_CATEGORY_ID);
+  }
+
   modalOverlay.classList.toggle('withdraw-mode', !isAdd);
   modalOverlay.hidden = false;
   document.body.classList.add('modal-open');
@@ -617,6 +709,7 @@ function closeModal() {
     document.body.classList.remove('modal-open');
   }
   editingId = null;
+  categoryField.hidden = true;
   btnConfirm.textContent = 'Confirmar';
 }
 
@@ -629,6 +722,9 @@ async function confirmMovement() {
 
   const movements = loadMovements();
 
+  const isAdd = currentAction === 'add';
+  const category = isAdd ? '' : selectedCategory;
+
   if (editingId) {
     const index = movements.findIndex((m) => m.id === editingId);
     if (index !== -1) {
@@ -636,6 +732,7 @@ async function confirmMovement() {
         ...movements[index],
         amount,
         note: noteInput.value.trim(),
+        category,
       };
     }
   } else {
@@ -644,6 +741,7 @@ async function confirmMovement() {
       type: currentAction,
       amount,
       note: noteInput.value.trim(),
+      category,
       date: new Date().toISOString(),
     });
   }
@@ -664,6 +762,8 @@ async function confirmMovement() {
     btnConfirm.disabled = false;
   }
 }
+
+buildCategoryPicker();
 
 btnAdd.addEventListener('click', () => openModal('add'));
 btnWithdraw.addEventListener('click', () => openModal('withdraw'));
