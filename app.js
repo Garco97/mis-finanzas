@@ -451,13 +451,18 @@ function getMovementById(id) {
   return loadMovements().find((m) => m.id === id);
 }
 
-async function deleteMovement(id) {
+function deleteMovement(id) {
+  if (storage.isSyncing()) return;
+
   const movements = loadMovements().filter((m) => m.id !== id);
-  const result = await storage.saveMovements(movements);
+  storage.applyMovements(movements);
   renderAll();
-  if (!result.ok) {
-    showToast(`Borrado en el móvil. Error en Sheets: ${result.error}`);
-  }
+
+  storage.syncRemote().then((result) => {
+    if (!result.ok) {
+      showToast(`Borrado en el móvil. Error en Sheets: ${result.error}`);
+    }
+  });
 }
 
 function editMovement(id) {
@@ -714,6 +719,8 @@ function closeModal() {
 }
 
 async function confirmMovement() {
+  if (storage.isSyncing()) return;
+
   const amount = parseAmount(amountInput.value);
   if (!amount) {
     amountInput.focus();
@@ -746,24 +753,28 @@ async function confirmMovement() {
     });
   }
 
-  btnConfirm.disabled = true;
+  // Optimista: guardar en local, cerrar y refrescar al instante; sincronizar en segundo plano
+  storage.applyMovements(movements);
+  closeModal();
+  renderAll();
 
-  try {
-    const result = await storage.saveMovements(movements);
-    closeModal();
-    renderAll();
-
+  storage.syncRemote().then((result) => {
     if (!result.ok) {
       showToast(`Guardado en el móvil. Error en Sheets: ${result.error}`);
     }
-  } catch (error) {
-    showToast(error.message || 'No se pudo guardar');
-  } finally {
-    btnConfirm.disabled = false;
-  }
+  });
 }
 
 buildCategoryPicker();
+
+storage.subscribeSync((syncing) => {
+  btnConfirm.disabled = syncing;
+  confirmDelete.disabled = syncing;
+  btnRefreshButtons.forEach((btn) => {
+    btn.disabled = syncing;
+    btn.classList.toggle('is-spinning', syncing);
+  });
+});
 
 btnAdd.addEventListener('click', () => openModal('add'));
 btnWithdraw.addEventListener('click', () => openModal('withdraw'));
@@ -882,22 +893,21 @@ function handlePromptDismiss() {
 }
 
 async function handleRefresh() {
-  btnRefreshButtons.forEach((btn) => {
-    btn.disabled = true;
-    btn.classList.add('is-spinning');
-  });
+  if (storage.isSyncing()) return;
+
+  if (!storage.getUser()) {
+    renderAll();
+    return;
+  }
 
   try {
-    if (storage.getUser()) {
-      const result = await storage.refreshFromCloud();
-      if (!result.ok && result.error) {
-        showToast(result.error);
-      }
+    const result = await storage.refreshFromCloud();
+    renderAll();
+    if (!result.ok && result.error) {
+      showToast(result.error);
     }
   } catch (error) {
     showToast(error.message || 'Error al actualizar');
-  } finally {
-    location.reload();
   }
 }
 

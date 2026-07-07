@@ -29,4 +29,7 @@
 - Guardado silencioso → toast + guardar local primero
 - Sesión Google: 90 días en local; token se renueva en silencio antes de caducar
 - Hoja: caché primero (estable); Drive solo como fallback y mantiene la anterior si existe
+- Guardado optimista: aplica local + cierra modal al instante; Sheets sincroniza en segundo plano
+- `storage.subscribeSync`/`isSyncing`: bloquea Aceptar y Actualizar mientras hay petición
+- Al arrancar se fusiona local+remoto por si quedó un cambio sin subir
 - Borrado en Sheets → limpiar filas A2:E antes de reescribir (batchUpdate no borra sobrantes)

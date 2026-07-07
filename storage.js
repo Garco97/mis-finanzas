@@ -17,6 +17,31 @@ let movementsCache = [];
 let syncMode = 'local';
 let lastSyncError = null;
 
+let syncing = false;
+const syncListeners = new Set();
+
+function setSyncing(value) {
+  if (syncing === value) return;
+  syncing = value;
+  syncListeners.forEach((cb) => {
+    try {
+      cb(value);
+    } catch {
+      // no romper el resto de listeners
+    }
+  });
+}
+
+export function isSyncing() {
+  return syncing;
+}
+
+export function subscribeSync(callback) {
+  syncListeners.add(callback);
+  callback(syncing);
+  return () => syncListeners.delete(callback);
+}
+
 function getLocalKey() {
   const user = getCurrentUser();
   return user?.sub ? `${LOCAL_KEY_PREFIX}-${user.sub}` : LOCAL_KEY_PREFIX;
@@ -85,6 +110,12 @@ export async function refreshFromCloud() {
     return { ok: false };
   }
 
+  // No leer de la nube mientras se está guardando: evitaría pisar el cambio recién hecho
+  if (syncing) {
+    return { ok: false, skipped: true };
+  }
+
+  setSyncing(true);
   try {
     movementsCache = await loadMovementsFromSheet();
     writeLocal(movementsCache);
@@ -94,6 +125,8 @@ export async function refreshFromCloud() {
   } catch (error) {
     lastSyncError = error.message;
     return { ok: false, error: error.message };
+  } finally {
+    setSyncing(false);
   }
 }
 
@@ -113,15 +146,28 @@ export async function tryRestoreSession() {
 
   await ensureValidToken();
 
-  const result = await refreshFromCloud();
-  if (result.ok) {
-    return { authenticated: true, user, mode: 'sheets' };
-  }
+  try {
+    const remoteItems = await loadMovementsFromSheet();
+    const localItems = readLocal();
+    const merged = mergeMovements(localItems, remoteItems);
 
-  lastSyncError = result.error;
-  movementsCache = readLocal();
-  syncMode = 'local';
-  return { authenticated: true, user, mode: 'local', error: result.error };
+    movementsCache = merged;
+    writeLocal(merged);
+    syncMode = 'sheets';
+    lastSyncError = null;
+
+    // Si había cambios locales sin subir (p. ej. la app se cerró antes de sincronizar), súbelos
+    if (merged.length !== remoteItems.length) {
+      syncRemote();
+    }
+
+    return { authenticated: true, user, mode: 'sheets' };
+  } catch (error) {
+    lastSyncError = error.message;
+    movementsCache = readLocal();
+    syncMode = 'local';
+    return { authenticated: true, user, mode: 'local', error: error.message };
+  }
 }
 
 export async function completeSignIn(existingUser = null) {
@@ -148,17 +194,22 @@ export async function completeSignIn(existingUser = null) {
   }
 }
 
-export async function saveMovements(items) {
+// Guarda al instante en local/caché y actualiza la UI sin esperar a la red.
+export function applyMovements(items) {
   movementsCache = items;
   writeLocal(items);
+}
 
+// Sincroniza la caché actual con Google Sheets en segundo plano.
+export async function syncRemote() {
   if (!isGoogleConfigured() || !getCurrentUser()) {
     syncMode = 'local';
     return { ok: true, mode: 'local' };
   }
 
+  setSyncing(true);
   try {
-    await saveMovementsToSheet(items);
+    await saveMovementsToSheet(movementsCache);
     syncMode = 'sheets';
     lastSyncError = null;
     return { ok: true, mode: 'sheets' };
@@ -166,7 +217,15 @@ export async function saveMovements(items) {
     lastSyncError = error.message;
     syncMode = 'local';
     return { ok: false, mode: 'local', error: error.message };
+  } finally {
+    setSyncing(false);
   }
+}
+
+// Compatibilidad: guarda local y sincroniza (esperando el resultado).
+export async function saveMovements(items) {
+  applyMovements(items);
+  return syncRemote();
 }
 
 export function clearAfterSignOut() {
