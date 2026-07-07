@@ -26,4 +26,5 @@
 - Sheets API desactivada → activar en GCP
 - Guardado silencioso → toast + guardar local primero
 - Sesión Google: 90 días en local; token se renueva en silencio antes de caducar
+- Hoja: caché primero (estable); Drive solo como fallback y mantiene la anterior si existe
 - Borrado en Sheets → limpiar filas A2:E antes de reescribir (batchUpdate no borra sobrantes)

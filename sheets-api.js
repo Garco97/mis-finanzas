@@ -83,7 +83,7 @@ async function loadMovementsFromSpreadsheetId(spreadsheetId) {
   return rowsToMovements(data.values || []);
 }
 
-async function findSpreadsheetInDrive() {
+async function findSpreadsheetInDrive(preferredId = null) {
   try {
     const query = encodeURIComponent(
       `name = '${SPREADSHEET_TITLE}' and mimeType = 'application/vnd.google-apps.spreadsheet' and trashed = false`
@@ -97,6 +97,12 @@ async function findSpreadsheetInDrive() {
     if (files.length === 0) return null;
     if (files.length === 1) return files[0].id;
 
+    // Si la hoja que ya usábamos sigue existiendo, mantenerla (evita saltar entre duplicados)
+    if (preferredId && files.some((file) => file.id === preferredId)) {
+      return preferredId;
+    }
+
+    // Con duplicados, elegir de forma estable: más movimientos y, a igualdad, la más antigua
     let bestId = files[0].id;
     let bestCount = -1;
 
@@ -153,22 +159,25 @@ async function resolveSpreadsheetId({ createIfMissing }) {
   if (!user?.sub) throw new Error('Usuario no autenticado');
 
   const storageKey = getSheetIdKey(user.sub);
+  const cachedId = localStorage.getItem(storageKey);
 
-  // Drive primero: misma hoja en móvil y PC aunque cada uno tenga caché distinta
-  const driveId = await findSpreadsheetInDrive();
+  // 1. Caché primero: si la hoja que ya usábamos sigue accesible, no cambiar nunca de hoja
+  if (cachedId && await isSpreadsheetAccessible(cachedId)) {
+    return cachedId;
+  }
+
+  if (cachedId) {
+    clearCachedSpreadsheetId(storageKey);
+  }
+
+  // 2. Buscar en Drive (sincroniza móvil/PC); si existe la anterior, mantenerla
+  const driveId = await findSpreadsheetInDrive(cachedId);
   if (driveId) {
     cacheSpreadsheetId(storageKey, driveId);
     return driveId;
   }
 
-  const cachedId = localStorage.getItem(storageKey);
-  if (cachedId) {
-    if (await isSpreadsheetAccessible(cachedId)) {
-      return cachedId;
-    }
-    clearCachedSpreadsheetId(storageKey);
-  }
-
+  // 3. Solo crear una hoja nueva si de verdad no hay ninguna
   if (!createIfMissing) return null;
 
   return createSpreadsheet(storageKey);
