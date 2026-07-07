@@ -27,6 +27,13 @@ const confirmCancel = document.getElementById('confirm-cancel');
 const confirmDelete = document.getElementById('confirm-delete');
 const viewWallet = document.getElementById('view-wallet');
 const viewStats = document.getElementById('view-stats');
+const viewCategories = document.getElementById('view-categories');
+const categoryFilter = document.getElementById('category-filter');
+const catFilterSummaryLabel = document.getElementById('cat-filter-summary-label');
+const catFilterSummaryValue = document.getElementById('cat-filter-summary-value');
+const catListTitle = document.getElementById('cat-list-title');
+const catList = document.getElementById('cat-list');
+const catEmpty = document.getElementById('cat-empty');
 const statsLabel = document.getElementById('stats-label');
 const statsListTitle = document.getElementById('stats-list-title');
 const statsList = document.getElementById('stats-list');
@@ -65,6 +72,7 @@ let openSwipeRow = null;
 let activeSwipeRow = null;
 let swipeDrag = null;
 let currentView = 'wallet';
+let filterCategory = CATEGORIES[0].id;
 let statsPeriod = 'day';
 let statsDate = startOfDay(new Date());
 
@@ -292,8 +300,10 @@ function switchView(view) {
   currentView = view;
   viewWallet.hidden = view !== 'wallet';
   viewStats.hidden = view !== 'stats';
+  viewCategories.hidden = view !== 'categories';
   viewWallet.classList.toggle('view-active', view === 'wallet');
   viewStats.classList.toggle('view-active', view === 'stats');
+  viewCategories.classList.toggle('view-active', view === 'categories');
 
   tabbarBtns.forEach((btn) => {
     const isActive = btn.dataset.view === view;
@@ -303,6 +313,8 @@ function switchView(view) {
 
   if (view === 'stats') {
     renderStats();
+  } else if (view === 'categories') {
+    renderCategories();
   } else {
     closeAllSwipes();
   }
@@ -415,10 +427,73 @@ function renderCategoryBreakdown(movements, totalExpense) {
   categoryBreakdown.hidden = false;
 }
 
+function buildCategoryFilter() {
+  categoryFilter.innerHTML = '';
+
+  for (const category of CATEGORIES) {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'cat-filter-chip';
+    chip.dataset.category = category.id;
+    chip.style.setProperty('--cat-color', category.color);
+    chip.setAttribute('role', 'radio');
+    chip.setAttribute('aria-checked', 'false');
+    chip.innerHTML = `<span class="chip-icon" aria-hidden="true">${category.icon}</span>${category.label}`;
+    chip.addEventListener('click', () => {
+      filterCategory = category.id;
+      renderCategories();
+    });
+    categoryFilter.appendChild(chip);
+  }
+}
+
+function renderCategories() {
+  const category = getCategoryOrDefault(filterCategory);
+
+  categoryFilter.querySelectorAll('.cat-filter-chip').forEach((chip) => {
+    const isSelected = chip.dataset.category === category.id;
+    chip.classList.toggle('is-selected', isSelected);
+    chip.setAttribute('aria-checked', String(isSelected));
+  });
+
+  const matching = loadMovements()
+    .filter((m) => m.type !== 'add' && getCategoryOrDefault(m.category).id === category.id)
+    .sort((a, b) => new Date(b.date) - new Date(a.date));
+
+  const total = matching.reduce((sum, m) => sum + m.amount, 0);
+
+  catFilterSummaryLabel.textContent = `${category.icon} ${category.label}`;
+  catFilterSummaryValue.textContent = formatMoney(total);
+  catListTitle.textContent = `Movimientos (${matching.length})`;
+
+  catList.innerHTML = '';
+
+  if (matching.length === 0) {
+    catList.appendChild(catEmpty);
+    catEmpty.hidden = false;
+    return;
+  }
+
+  for (const movement of matching) {
+    const li = document.createElement('li');
+    li.className = 'stats-item';
+    li.innerHTML = `
+      <div class="movement-info">
+        <div class="movement-type">Gasto</div>
+        ${movement.note ? `<div class="movement-note">${escapeHtml(movement.note)}</div>` : ''}
+        <div class="movement-date">${formatDate(movement.date)}</div>
+      </div>
+      <div class="movement-amount withdraw">−${formatMoney(movement.amount)}</div>
+    `;
+    catList.appendChild(li);
+  }
+}
+
 function renderAll() {
   updateNotificationsUI();
   renderWallet();
   renderStats();
+  if (currentView === 'categories') renderCategories();
 }
 
 function renderWallet() {
@@ -766,6 +841,7 @@ async function confirmMovement() {
 }
 
 buildCategoryPicker();
+buildCategoryFilter();
 
 storage.subscribeSync((syncing) => {
   btnConfirm.disabled = syncing;

@@ -23,6 +23,7 @@
 - Caché local en `localStorage`
 - Columnas: id, type, amount, note, date, category (A-F)
 - Categorías de gasto en `categories.js`; selector en modal (solo gastos); desglose en Estadísticas
+- Pestaña "Categorías": filtra por categoría y lista todos sus gastos (sin límite de fechas)
 
 ## Problemas resueltos
 - Sheets API desactivada → activar en GCP
